@@ -1,1 +1,6 @@
 *.png
+
+
+__pycache__
+*.py[cod]
+
