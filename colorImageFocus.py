@@ -1,4 +1,4 @@
-import argparse
+import argparse, uuid
 import cv2
 import numpy as np
 from constants.ultrasoundConstants import HSV_COLOR_THRESHOLD
@@ -13,8 +13,8 @@ def get_color_image_focus(path_to_image, path_to_output_directory, HSV_lower_bou
     is surrounded by a bright rectangle and saves it to file. 
 
     Arguments:
-        path_to_image:
-        path_to_output_directory: 
+        path_to_image: path to input image file
+        path_to_output_directory: path to output directory 
         HSV_lower_bound: np.array([1, 3], uint8) lower HSV threshold to find highlight box
         HSV_upper_bound: np.array([1, 3], uint8) upper HSV threshold to find highlight box
 
@@ -24,80 +24,59 @@ def get_color_image_focus(path_to_image, path_to_output_directory, HSV_lower_bou
     Raises:
         IOError: in case of any errors with OpenCV or file operations 
 
-
     '''
     try:
         
-        # load the example image and convert it to grayscale
+        # Load the image and convert it to HSV from BGR
+        # Then, threshold the HSV image to get only target border color
+
         bgr_image = cv2.imread(path_to_image, cv2.IMREAD_COLOR)
+        hsv_image = cv2.cvtColor(bgr_image, cv2.COLOR_BGR2HSV)
+        mask = cv2.inRange(hsv_image, HSV_lower_bound, HSV_upper_bound)
 
-        hsv = cv2.cvtColor(bgr_image, cv2.COLOR_BGR2HSV)
+        # Determine contours of the masked image
 
-        # Threshold the HSV image to get only blue colors
-        mask = cv2.inRange(hsv, HSV_lower_bound, HSV_upper_bound)
+        contours = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)[1]
 
-        # Bitwise-AND mask and original image
-        masked_output = cv2.bitwise_and(bgr_image, bgr_image, mask=mask)
+        if len(contours) == 0:
+             raise Exception('Unable to find any matching contours')
 
-        ret, thresh = cv2.threshold(mask, 40, 255, 0)
+        # Contour with maximum enclosed area corresponds to highlight rectangle
 
-        im2,contours,hierarchy = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+        max_contour = max(contours, key = cv2.contourArea)
+        x, y, w, h = cv2.boundingRect(max_contour)
 
-        if len(contours) != 0:
+        # Crop the image to the bounding rectangle
 
-            # draw in blue the contours that were founded
-            cv2.drawContours(masked_output, contours, -1, 255, 3)
+        focus_bgr_image = bgr_image[y:y+h, x:x+w]
 
-            #find the biggest area
-            c = max(contours, key = cv2.contourArea)
+        # The bounding box includes the border. Remove the border by masking on the same 
+        # thresholds as the initial mask, then flip the mask and draw a bounding box. 
 
-            x,y,w,h = cv2.boundingRect(c)
+        focus_hsv = cv2.cvtColor(focus_bgr_image, cv2.COLOR_BGR2HSV)
+        mask = cv2.inRange(focus_hsv, HSV_lower_bound, HSV_upper_bound)
+        mask = cv2.bitwise_not(mask)
 
-            # draw the book contour (in green)
-            cv2.rectangle(masked_output,(x,y),(x+w,y+h),(0,255,0),2)
+        contours = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)[1]
 
-            # Crop the image to the bounding rectangle
-            focus_bgr_image = bgr_image[y:y+h, x:x+w]
-
-            # The bounding box includes the border. Remove the border by masking on the same 
-            # thresholds as the initial mask, then flip the mask and draw a bounding box. 
-
-            focus_hsv = cv2.cvtColor(focus_bgr_image, cv2.COLOR_BGR2HSV)
-            mask = cv2.inRange(focus_hsv, HSV_lower_bound, HSV_upper_bound)
-            mask = cv2.bitwise_not(mask)
-        
-            # Bitwise-AND mask and original image
-            masked_output = cv2.bitwise_and(focus_bgr_image, focus_bgr_image, mask=mask)
-
-            ret, thresh = cv2.threshold(mask, 40, 255, 0)
-
-
-            im2,contours,hierarchy = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-
-            if len(contours) != 0:
-
-                # draw in blue the contours that were founded
-                cv2.drawContours(masked_output, contours, -1, 255, 3)
-
-                #find the biggest area
-                c = max(contours, key = cv2.contourArea)
-
-                x,y,w,h = cv2.boundingRect(c)
-
-                # draw the book contour (in green)
-                cv2.rectangle(masked_output,(x,y),(x+w,y+h),(0,255,0), 2)
-
-                # Crop the image to the bounding rectangle
-                # As conservative measure crop inwards 3 pixels to guarantee no boundary
-
-                cropped_image = focus_bgr_image[y+3:y+h-3, x+3:x+w-3]
-
-                cv2.imshow('Original', bgr_image)
-                cv2.imshow("Result", cropped_image)
-                cv2.waitKey(0)
-
-        else:
+        if len(contours) == 0:
             raise Exception('Unable to find any matching contours')
+
+        #find the biggest area
+        max_contour = max(contours, key = cv2.contourArea)
+
+        x, y, w, h = cv2.boundingRect(max_contour)
+
+        # Crop the image to the bounding rectangle
+        # As conservative measure crop inwards 3 pixels to guarantee no boundary
+
+        cropped_image = focus_bgr_image[y+3:y+h-3, x+3:x+w-3]
+
+        output_path = '{0}/{1}.png'.format(path_to_output_directory, uuid.uuid4())
+
+        cv2.imwrite(output_path, cropped_image)
+
+        return output_path
 
     except Exception as exception:
         raise IOError('Error isolating and saving image focus')
