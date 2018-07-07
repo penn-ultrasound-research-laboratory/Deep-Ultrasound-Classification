@@ -30,8 +30,10 @@ def get_color_image_focus(path_to_image, path_to_output_directory, HSV_lower_bou
         # Load the image and convert it to HSV from BGR
         # Then, threshold the HSV image to get only target border color
 
-        image = cv2.imread(path_to_image, cv2.IMREAD_GRAYSCALE)
-        mask = cv2.inRange(image, 0, 1)
+        bgr_image = cv2.imread(path_to_image, cv2.IMREAD_COLOR)
+        mask = cv2.inRange(bgr_image, np.array([10, 10, 10], np.uint8), np.array([255, 255, 255], np.uint8))
+        cv2.imshow('mask', mask)
+        cv2.waitKey(0)
 
         # Determine contours of the masked image
 
@@ -41,13 +43,13 @@ def get_color_image_focus(path_to_image, path_to_output_directory, HSV_lower_bou
              raise Exception('Unable to find any matching contours')
 
         # Contour with maximum enclosed area corresponds to highlight rectangle
-
+        
         max_contour = max(contours, key = cv2.contourArea)
         x, y, w, h = cv2.boundingRect(max_contour)
 
         # Crop the image to the bounding rectangle
 
-        focus_image = image[y:y+h, x:x+w]
+        focus_image = bgr_image[y:y+h, x:x+w]
         cv2.imshow('focus', focus_image)
         cv2.waitKey(0)
   
