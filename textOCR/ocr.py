@@ -21,10 +21,7 @@ def isolate_text(grayscale_image, image_type):
 	# Attempt to crop the top section 
 	left_bar_crop= grayscale_image[50:, :100]
 	bottom_left_crop = grayscale_image[350:, 30:140]
-	color_bar_crop = grayscale_image[50:, 595:]
-
-	cv2.imshow('bar.', color_bar_crop)
-	cv2.waitKey(0)
+	# color_bar_crop = grayscale_image[50:, 595:]
 
 	# write the grayscale image to disk as a temporary file so we can
 	# apply OCR to it
@@ -34,8 +31,8 @@ def isolate_text(grayscale_image, image_type):
 	bottom_left_filename = '{}.png'.format(uuid.uuid4())
 	cv2.imwrite(bottom_left_filename, bottom_left_crop)
 
-	color_bar_filename = '{}.png'.format(uuid.uuid4())
-	cv2.imwrite(color_bar_filename, color_bar_crop)
+	# color_bar_filename = '{}.png'.format(uuid.uuid4())
+	# cv2.imwrite(color_bar_filename, color_bar_crop)
 
 	# load the image as a PIL/Pillow image, apply OCR, and then delete
 	# the temporary file. Tesseract segmentation mode 11 is critical for this to work
@@ -53,14 +50,14 @@ def isolate_text(grayscale_image, image_type):
 		boxes=False,  
 		config='--psm 11 -c tessedit_char_whitelist=0123456789.') 
 
-	raw_text_color_bar = pytesseract.image_to_string(Image.open(color_bar_filename),
-		lang='eng',
-		boxes=False,  
-		config='--psm 11 -c tessedit_char_whitelist=0123456789.') 
+	# raw_text_color_bar = pytesseract.image_to_string(Image.open(color_bar_filename),
+	# 	lang='eng',
+	# 	boxes=False,  
+	# 	config='--psm 11 -c tessedit_char_whitelist=0123456789.') 
 
 	os.remove(left_bar_filename)
 	os.remove(bottom_left_filename)
-	os.remove(color_bar_filename)
+	# os.remove(color_bar_filename)
 
 	text_segments = raw_text.splitlines()
 	text_segments = [segment.upper().strip() for segment in text_segments if segment is not '']
