@@ -1,6 +1,21 @@
 import numpy as np
 from enum import Enum
 
+FOCUS_HASH_LABEL = 'FOCUS'
+FRAME_LABEL = 'FRAME'
+
+class HSV_COLOR_THRESHOLD(Enum):
+    LOWER = [60, 50, 50]
+    UPPER = [100, 255, 255]
+
+class HSV_GRAYSCALE_THRESHOLD(Enum):
+    LOWER = [78, 250, 0]
+    UPPER = [86, 255, 2]
+
+class IMAGE_TYPE(Enum):
+    GRAYSCALE = 'GRAYSCALE'
+    COLOR = 'COLOR'
+
 class READOUT_ABBREVS(Enum):
     COLOR_MODE = 'COLOR_MODE'
     COLOR_TYPE = 'COLOR_TYPE'
@@ -14,15 +29,3 @@ class READOUT_ABBREVS(Enum):
     SIZE = 'SIZE'
 
 WALL_FILTER_MODES = ['LOW', 'MED', 'HIGH']
-
-class IMAGE_TYPE(Enum):
-    GRAYSCALE = 'GRAYSCALE'
-    COLOR = 'COLOR'
-
-class HSV_COLOR_THRESHOLD(Enum):
-    LOWER = [60, 50, 50]
-    UPPER = [100, 255, 255]
-
-class HSV_GRAYSCALE_THRESHOLD(Enum):
-    LOWER = [78, 250, 0]
-    UPPER = [86, 255, 2]

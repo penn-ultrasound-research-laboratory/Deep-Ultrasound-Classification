@@ -1,11 +1,12 @@
 from datetime import datetime
-from constants.ultrasoundConstants import IMAGE_TYPE, HSV_COLOR_THRESHOLD
+from constants.ultrasoundConstants import (
+    IMAGE_TYPE, HSV_COLOR_THRESHOLD, FOCUS_HASH_LABEL, FRAME_LABEL)
 from utilities.imageUtilities import determine_image_type
 from imageFocus.colorImageFocus import get_color_image_focus
 from imageFocus.grayscaleImageFocus import get_grayscale_image_focus
 from textOCR.ocr import isolate_text
 import numpy as np
-import argparse, os, cv2
+import argparse, os, cv2, json
 
 def process_patient(
     absolute_path_to_patient_folder, 
@@ -53,6 +54,7 @@ def process_patient(
 
     frames = [name for name in os.listdir(absolute_path_to_frame_directory)]
 
+    found_text_records = []
     for frame in frames:
         print('Attempting frame: {0}'.format(frame))
         try: 
@@ -65,42 +67,41 @@ def process_patient(
 
             try:
                 if image_type is IMAGE_TYPE.COLOR:
-                    raise Exception('what the fuck is happening')
+
                     hash = get_color_image_focus(
                         path_to_frame, 
                         absolute_path_to_focus_output_directory, 
                         np.array(HSV_COLOR_THRESHOLD.LOWER.value, np.uint8), 
                         np.array(HSV_COLOR_THRESHOLD.UPPER.value, np.uint8))
 
-                    print(hash)
-
                 else: 
                     # Do Nothing
                     pass
 
-            except Exception as e:
-                # Image focus acquisition failed. Bubble up the error with frame information.
-                print('[{0}, {1}] | {2}'.format(patient_label, frame, e))
-                raise Exception('[{0}, {1}] | {2}'.format(patient_label, frame, e))
-                
-            try:
                 grayscale_image = cv2.cvtColor(bgr_image, cv2.COLOR_BGR2GRAY)
                 grayscale_image = cv2.threshold(grayscale_image, 0, 255,
                     cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
 
                 found_text = isolate_text(grayscale_image, image_type)
 
-            except Exception as e: 
-                pass
+                found_text[FOCUS_HASH_LABEL] = hash
+                found_text[FRAME_LABEL] = os.path.basename(path_to_frame)
+                
+                found_text_records.append(found_text)
+
+            except Exception as e:
+                # Image focus acquisition failed. Bubble up the error with frame information.
+                raise Exception('[{0}, {1}] | {2}'.format(patient_label, frame, e))
 
         except Exception as e:
                 
             # Write the specific error in the failure log. Progress to the next frame
-
-            print('upper')
             failure_log_file_pointer.write('{0}\n'.format(e))
             continue
 
+        # Dump all valid records to the manifest
+
+    json.dump(found_text_records, manifest_file_pointer, indent=4)
             
 
 ## for each image in a sub-folder
