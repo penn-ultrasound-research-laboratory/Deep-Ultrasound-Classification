@@ -39,7 +39,7 @@ def get_color_image_focus(path_to_image, path_to_output_directory, HSV_lower_bou
         contours = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)[1]
 
         if len(contours) == 0:
-             raise Exception('Unable to find any matching contours')
+             raise Exception('Unable to find any matching contours.')
 
         # Contour with maximum enclosed area corresponds to highlight rectangle
 
@@ -60,7 +60,7 @@ def get_color_image_focus(path_to_image, path_to_output_directory, HSV_lower_bou
         contours = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)[1]
 
         if len(contours) == 0:
-            raise Exception('Unable to find any matching contours')
+            raise Exception('Unable to find any matching contours.')
 
         #find the biggest area
         max_contour = max(contours, key = cv2.contourArea)
@@ -78,9 +78,8 @@ def get_color_image_focus(path_to_image, path_to_output_directory, HSV_lower_bou
 
         return output_path
 
-    except Exception as exception:
-        raise IOError('Error isolating and saving image focus')
-
+    except Exception as e:
+        raise IOError('Error isolating and saving image focus. ' + str(e))
 
 if __name__ == '__main__':
 
