@@ -1,6 +1,7 @@
 from datetime import datetime
 from constants.ultrasoundConstants import (
-    IMAGE_TYPE, HSV_COLOR_THRESHOLD, FOCUS_HASH_LABEL, FRAME_LABEL)
+    IMAGE_TYPE, HSV_COLOR_THRESHOLD, 
+    FOCUS_HASH_LABEL, FRAME_LABEL, TUMOR_TYPES, TUMOR_TYPE_LABEL)
 from utilities.imageUtilities import determine_image_type
 from imageFocus.colorImageFocus import get_color_image_focus
 from imageFocus.grayscaleImageFocus import get_grayscale_image_focus
@@ -86,12 +87,13 @@ def process_patient(
 
                 found_text[FOCUS_HASH_LABEL] = os.path.basename(hash_path)
                 found_text[FRAME_LABEL] = os.path.basename(path_to_frame)
+                found_text[TUMOR_TYPE_LABEL] = patient_type_label
                 
                 found_text_records.append(found_text)
 
             except Exception as e:
                 # Image focus acquisition failed. Bubble up the error with frame information.
-                raise Exception('[{0}, {1}] | {2}'.format(patient_label, frame, e))
+                raise Exception('[{0}, {1}, {2}] | {3}'.format(patient_label, frame, image_type, e))
 
         except Exception as e:
                 
@@ -170,6 +172,7 @@ def process_patient_set(
 
         patient_records[patient] = acquired_records
         
+        break
     # Write all patient records to manifest file. 
 
     patient_records['TIMESTAMP'] = timestamp
@@ -201,7 +204,7 @@ if __name__ == '__main__':
     parser.add_argument('-focus', '--relative_path_to_focus_output_folder', type=str, default='focus',
         help='relative path from the patient folder to frame focus output folder ')
 
-    parser.add_argument('-label', '--patient_type_label', type=str, default=None, 
+    parser.add_argument('-label', '--patient_type_label', choices=TUMOR_TYPES, default=None, 
         help='type of patient. Prefix in filename and present in all records')
 
     ## Missing functionality to wipe out old folders, manifests, error logs
