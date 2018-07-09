@@ -4,7 +4,7 @@ import numpy as np
 from constants.ultrasoundConstants import HSV_GRAYSCALE_THRESHOLD
 
 
-def get_color_image_focus(path_to_image, path_to_output_directory, HSV_lower_bound, HSV_upper_bound):
+def get_grayscale_image_focus(path_to_image, path_to_output_directory, HSV_lower_bound, HSV_upper_bound):
     '''
     Determines the "focus" of an ultrasound frame in Color/CPA. 
 

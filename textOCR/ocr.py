@@ -98,7 +98,16 @@ def isolate_text(grayscale_image, image_type):
 		
 		numerical_strings = [num_string for num_string in re.findall(r'[\d.]+', mode_segment)]
 		numerical_strings = [ns.replace('.', '') for ns in numerical_strings]
-		FOUND_TEXT[COLOR_LEVEL] = int(max(numerical_strings, key=len))
+		color_level = int(max(numerical_strings, key=len))
+
+		# A common transcription error with tesseract OCR is reading '8' as '3'.
+		# Expert knowledge says it is highly unlikely for the ultrasound operator to take a color
+		# scan with power level below 50%. Therefore, manually adjust any '3' as leading digit to '8'
+
+		if divmod(color_level, 10)[0] == 3:
+			color_level = 80 + divmod(color_level, 10)[1]
+
+		FOUND_TEXT[COLOR_LEVEL] = color_level
 
 		# Find the segment with Wall Filter (WF)
 
