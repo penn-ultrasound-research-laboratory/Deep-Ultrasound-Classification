@@ -33,7 +33,7 @@ def process_patient(
         patient_type_label: (optional) type of patient. Prefix in filename and present in all records
 
     Returns:
-        A tuple containing: (Integer: #sucesses, Integer: #failures)
+        A list of records for all cleanly processed patient frames
     '''
 
     patient_label = os.path.basename(absolute_path_to_patient_folder)
@@ -68,7 +68,7 @@ def process_patient(
             try:
                 if image_type is IMAGE_TYPE.COLOR:
 
-                    hash = get_color_image_focus(
+                    hash_path = get_color_image_focus(
                         path_to_frame, 
                         absolute_path_to_focus_output_directory, 
                         np.array(HSV_COLOR_THRESHOLD.LOWER.value, np.uint8), 
@@ -84,7 +84,7 @@ def process_patient(
 
                 found_text = isolate_text(grayscale_image, image_type)
 
-                found_text[FOCUS_HASH_LABEL] = hash
+                found_text[FOCUS_HASH_LABEL] = os.path.basename(hash_path)
                 found_text[FRAME_LABEL] = os.path.basename(path_to_frame)
                 
                 found_text_records.append(found_text)
@@ -101,45 +101,8 @@ def process_patient(
 
         # Dump all valid records to the manifest
 
-    json.dump(found_text_records, manifest_file_pointer, indent=4)
+    return found_text_records
             
-
-## for each image in a sub-folder
-
-    # Create a manifest.json and an failures.json
-
-    ## Make an Assessment composed of Tasks. 
-    # If any task fails, need a log marking the frame/folder/class combo as issue with an issue message
-    # Assessment should be stored as JSON object:
-
-    # {
-    #   pathToFrame: /path_to_frame 
-    #   patientId: String
-    #   radiality: Enum (RAD, ARAD)
-    #   colorLevel: integer (%)
-    #   wallFilter: integer 
-    #   pulseRepititionFrequency: integer 
-    #   pathToFocus: /path_to_focus
-    # }
-
-    # Task 1) Radiality
-    # Task 2) Mode determination (Grayscale/Compound-SonoCT/Color/CPA)
-    
-    # GRAYSCALE:
-        # Task 3) Size determination in lower left
-
-    # COLOR/CPA
-        # Task 3.A) Color/CPA Level
-        # Task 3.B) Pulse repitition frequency
-        # Task 3.C) Wall Filter
-
-    # Task 4) Pull the image focus out of the frame
-        # GRAYSCALE
-            # Grab a large cropping from the center? 
-        
-        # COLOR/CPA (DONE)
-            # Pull the green rectangle
-
 
 
 def process_patient_set(
@@ -167,7 +130,6 @@ def process_patient_set(
         A tuple containing: (Integer: #sucesses, Integer: #failures)
     '''
 
-
     timestamp =  datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
 
     manifest_absolute_path = '{0}/manifest_{1}_{2}.json'.format(
@@ -188,6 +150,7 @@ def process_patient_set(
     patient_subdirectories = [name for name in os.listdir(path_to_top_level_directory) 
         if os.path.isdir(os.path.join(path_to_top_level_directory, name))]
 
+    patient_records = {}
     for patient in patient_subdirectories:
 
         print('Processing patient: {0}'.format(patient))
@@ -196,7 +159,7 @@ def process_patient_set(
             path_to_top_level_directory.rstrip('/'),
             patient)
 
-        process_patient(
+        acquired_records = process_patient(
             patient_directory_absolute_path, 
             relative_path_to_frames_folder, 
             relative_path_to_focus_output_folder,
@@ -205,7 +168,14 @@ def process_patient_set(
             timestamp,
             patient_type_label)
 
-        break
+        patient_records[patient] = acquired_records
+        
+    # Write all patient records to manifest file. 
+
+    patient_records['TIMESTAMP'] = timestamp
+    patient_records['FRAME_FOLDER'] = relative_path_to_frames_folder
+    patient_records['FOCUS_FOLDER'] = relative_path_to_focus_output_folder
+    json.dump(patient_records, manifest_file, indent=4)
 
     # Cleanup
 
