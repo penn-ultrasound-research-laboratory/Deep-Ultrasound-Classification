@@ -9,8 +9,8 @@ class HSV_COLOR_THRESHOLD(Enum):
     UPPER = [100, 255, 255]
 
 class HSV_GRAYSCALE_THRESHOLD(Enum):
-    LOWER = [78, 250, 0]
-    UPPER = [86, 255, 2]
+    LOWER = [1, 1, 1]
+    UPPER = [255, 255, 255]
 
 class IMAGE_TYPE(Enum):
     GRAYSCALE = 'GRAYSCALE'
