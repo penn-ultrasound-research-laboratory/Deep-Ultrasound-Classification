@@ -1,6 +1,9 @@
 from datetime import datetime
 from constants.ultrasoundConstants import (
-    IMAGE_TYPE, HSV_COLOR_THRESHOLD, FOCUS_HASH_LABEL, FRAME_LABEL)
+    IMAGE_TYPE, HSV_COLOR_THRESHOLD, 
+    FOCUS_HASH_LABEL, FRAME_LABEL, 
+    TUMOR_TYPES, TUMOR_TYPE_LABEL, 
+    HSV_GRAYSCALE_THRESHOLD)
 from utilities.imageUtilities import determine_image_type
 from imageFocus.colorImageFocus import get_color_image_focus
 from imageFocus.grayscaleImageFocus import get_grayscale_image_focus
@@ -75,8 +78,14 @@ def process_patient(
                         np.array(HSV_COLOR_THRESHOLD.UPPER.value, np.uint8))
 
                 else: 
-                    # Do Nothing
-                    pass
+                    hash_path = get_grayscale_image_focus(
+                        path_to_frame, 
+                        absolute_path_to_focus_output_directory, 
+                        np.array(HSV_GRAYSCALE_THRESHOLD.LOWER.value, np.uint8), 
+                        np.array(HSV_GRAYSCALE_THRESHOLD.UPPER.value, np.uint8))
+
+    
+                
 
                 grayscale_image = cv2.cvtColor(bgr_image, cv2.COLOR_BGR2GRAY)
                 grayscale_image = cv2.threshold(grayscale_image, 0, 255,
@@ -86,12 +95,15 @@ def process_patient(
 
                 found_text[FOCUS_HASH_LABEL] = os.path.basename(hash_path)
                 found_text[FRAME_LABEL] = os.path.basename(path_to_frame)
+                found_text[TUMOR_TYPE_LABEL] = patient_type_label
                 
+                found_text['IMAGE_TYPE'] = IMAGE_TYPE.COLOR.value if image_type is IMAGE_TYPE.COLOR else IMAGE_TYPE.GRAYSCALE.value
+
                 found_text_records.append(found_text)
 
             except Exception as e:
                 # Image focus acquisition failed. Bubble up the error with frame information.
-                raise Exception('[{0}, {1}] | {2}'.format(patient_label, frame, e))
+                raise Exception('[{0}, {1}, {2}] | {3}'.format(patient_label, frame, image_type, e))
 
         except Exception as e:
                 
@@ -170,6 +182,7 @@ def process_patient_set(
 
         patient_records[patient] = acquired_records
         
+        break
     # Write all patient records to manifest file. 
 
     patient_records['TIMESTAMP'] = timestamp
@@ -201,7 +214,7 @@ if __name__ == '__main__':
     parser.add_argument('-focus', '--relative_path_to_focus_output_folder', type=str, default='focus',
         help='relative path from the patient folder to frame focus output folder ')
 
-    parser.add_argument('-label', '--patient_type_label', type=str, default=None, 
+    parser.add_argument('-label', '--patient_type_label', choices=TUMOR_TYPES, default=None, 
         help='type of patient. Prefix in filename and present in all records')
 
     ## Missing functionality to wipe out old folders, manifests, error logs
