@@ -123,7 +123,8 @@ def process_patient_set(
     relative_path_to_focus_output_folder,
     path_to_manifest_output_directory, 
     path_to_failures_output_directory,
-    patient_type_label=None):
+    patient_type_label=None,
+    timestamp=None):
     '''Processes a set of patients from a top level directory.
 
     A set of patient folders lives in a top level directory. Each patient is in its own folder. This script
@@ -142,7 +143,7 @@ def process_patient_set(
         A tuple containing: (Integer: #sucesses, Integer: #failures)
     '''
 
-    timestamp =  datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    timestamp =  timestamp if timestamp is not None else datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
 
     manifest_absolute_path = '{0}/manifest_{1}_{2}.json'.format(
         path_to_manifest_output_directory.rstrip('/'), 
@@ -182,7 +183,6 @@ def process_patient_set(
 
         patient_records[patient] = acquired_records
         
-        break
     # Write all patient records to manifest file. 
 
     patient_records['TIMESTAMP'] = timestamp
@@ -217,6 +217,10 @@ if __name__ == '__main__':
     parser.add_argument('-label', '--patient_type_label', choices=TUMOR_TYPES, default=None, 
         help='type of patient. Prefix in filename and present in all records')
 
+    parser.add_argument('-time', '--timestamp', type=str, default=None, 
+        help='timestamp to use instead of generating one using the current time')
+
+
     ## Missing functionality to wipe out old folders, manifests, error logs
 
     args = vars(parser.parse_args())
@@ -227,5 +231,6 @@ if __name__ == '__main__':
         args['relative_path_to_focus_output_folder'],
         args['path_to_manifest_output_directory'], 
         args['path_to_failures_output_directory'],
-        args['patient_type_label'])
+        args['patient_type_label'],
+        args['timestamp'])
 
