@@ -3,7 +3,6 @@ from constants.ultrasoundConstants import IMAGE_TYPE
 from constants.modelConstants import TRAIN_TEST_VALIDATION_SPLIT
 from math import floor
 import keras, argparse
-from keras.datasets import mnist
 from keras.layers import Dense, Flatten
 from keras.layers import Conv2D, MaxPooling2D
 from keras.models import Sequential
@@ -67,17 +66,21 @@ def patient_train_test_validation_split(benign_top_level_path, malignant_top_lev
 def prepare_training_data():
     """
 
+    Iterator will be declared with array of patients. On each call to iterator 
+
+    An Iterator yielding tuples of (x, y) where x is a numpy array of image data 
+    (in the case of a single image input) or a list of numpy arrays (in the case with additional inputs) 
+    and y is a numpy array of corresponding labels. If 'sample_weight' is not None, the yielded tuples are of the form (x, y, sample_weight). If y is None, only the numpy array x is returned.
     
     Arguments:
 
     Returns:
-        Keras ImageGenerator
+        Iterator that wraps a Keras ImageGenerator
 
     Raises 
-
-
     """
     
+    # Each patient is a batch for a specific class of image 
 
 
     train_datagen = ImageDataGenerator(
