@@ -1,10 +1,10 @@
-from constants.ultrasoundConstants import IMAGE_TYPE
+from constants.ultrasoundConstants import IMAGE_TYPE, TUMOR_TYPES
 from keras.preprocessing.image import ImageDataGenerator
 from constants.exceptions.customExceptions import PatientSampleGeneratorException
-
+import cv2
 
 class PatientSampleGenerator:
-    '''iterator that yields numbers in the Fibonacci sequence
+    '''Generator that returns batches of samples for training and evaluation
     
     Arguments:
         patient_list:
@@ -21,6 +21,15 @@ class PatientSampleGenerator:
         self.raw_patient_list = patient_list
         self.top_level_path = top_level_path
         self.manifest = manifest
+        self.top_level_path = top_level_path
+        # self.grayscaleDataGenerator = ImageDataGenerator()
+        # self.colorDataGenerator = ImageDataGenerator()
+
+    def reset_to_initial_patient(self):
+        self.patient_index = 0
+        self.patient_frames = [frame["IMAGE_TYPE"] == self.image_type.value
+                               for frame in self.manifest[self.cleared_patients[0]]]
+        self.frame_index = 0
 
     def __iter__(self):
         # Find all the patients with at least one frame in the specified IMAGE_TYPE
@@ -29,41 +38,36 @@ class PatientSampleGenerator:
                             any([frame["IMAGE_TYPE"] == self.image_type.value
                                  for frame in self.manifest[patient]])]
 
-
-
-        # find_patient = 0
-        # while find_patient < self.number_patients:
-        #     # if the patient contains any entries where the image type matches, break, else increment
-        #     if ):
-        #         break
-        #     else:
-        #         find_patient += 1
-        
         if len(cleared_patients) == 0:
             raise PatientSampleGeneratorException('No patients found with focus in image type: {0}'.format(self.image_type.value))
         
         self.cleared_patients = cleared_patients
-        self.patient_index = 0
-        self.patient_frames = [frame["IMAGE_TYPE"] == self.image_type.value
-                               for frame in self.manifest[cleared_patients[0]]]
-        self.frame_index = 0
+        self.reset_to_initial_patient()
 
         return self
 
     def __next__(self):
-        last_patient = self.patient_index == len(self.cleared_patients) - 1
-        last_frame = self.frame_index == len(self.patient_frames) - 1
+        is_last_patient = self.patient_index == len(self.cleared_patients) - 1
+        is_last_frame = self.frame_index == len(self.patient_frames) - 1
     
-        if last_patient and last_frame:
-            raise StopIteration
+        if is_last_patient and is_last_frame:
+            self.reset_to_initial_patient()
 
-        # DETERMINE THE CURRENT VALUES TO RETURN USES ImageGenerator on the current frame input
-        #   ....
-        #   ....
-        # return something????
+        patient = self.manifest[self.cleared_patients[self.patient_index]]
+        patient_type = patient[0]['TUMOR_TYPE']
+
+        loaded_image = cv2.imread("{0}/{1}/{2}/{3}/{4}".format(
+            self.top_level_path,
+            ("Benign" if patient_type == "BENIGN" else "Malignant"),
+            patient,
+            'focus',
+            patient[self.frame_index]['FOCUS']
+        ),
+            (cv2.IMREAD_COLOR if self.image_type.value == IMAGE_TYPE.COLOR.value else cv2.IMREAD_GRAYSCALE))
+
         THIS_IS_THE_RETURNED_VALUE = 12347981273489126512
 
-        if not last_frame:
+        if not is_last_frame:
             self.frame_index += 1
         else:
             self.patient_index += 1

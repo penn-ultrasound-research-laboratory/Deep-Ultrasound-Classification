@@ -93,7 +93,7 @@ def process_patient(
 
                 found_text = isolate_text(grayscale_image, image_type)
 
-                found_text[FOCUS_HASH_LABEL] = os.path.basename(hash_path)
+                found_text[FOCUS_HASH_LABEL] = hash_path
                 found_text[FRAME_LABEL] = os.path.basename(path_to_frame)
                 found_text[TUMOR_TYPE_LABEL] = patient_type_label
                 
