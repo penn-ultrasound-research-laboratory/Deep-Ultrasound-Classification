@@ -29,11 +29,12 @@ if __name__ == '__main__':
     with open(arguments["manifest_path"], 'r') as f:
         manifest = json.load(f) 
 
+    # classes = 2
+
     # Instantiate the resNet50 model
     model = ResNet50(
         include_top=False,
         input_shape=(None, None, 3),
-        classes=2,
         weights=None, 
         pooling='avg')
 
@@ -58,4 +59,6 @@ if __name__ == '__main__':
     model.fit_generator(
         next(patientGenerator),
         steps_per_epoch=1,
-        epochs=len(patientGenerator.cleared_patients))
+        epochs=len(patientGenerator.cleared_patients),
+        verbose=2,
+        workers=0)
