@@ -1,4 +1,7 @@
-from constants.ultrasoundConstants import IMAGE_TYPE
+from constants.ultrasoundConstants import (
+    IMAGE_TYPE, 
+    TUMOR_BENIGN, 
+    TUMOR_MALIGNANT)
 from constants.modelConstants import TRAIN_TEST_VALIDATION_SPLIT
 from math import floor
 import numpy as np
@@ -30,27 +33,29 @@ def patient_train_test_validation_split(benign_top_level_path, malignant_top_lev
     M = len(malignant_patients)
     B = len(benign_patients)
 
-    train_indices = np.random.choice(M, floor(TRAIN_TEST_VALIDATION_SPLIT["TRAIN"] * M), replace=False)
+    train_indices = np.random.choice(M, floor(TRAIN_TEST_VALIDATION_SPLIT["TRAIN"] * M), replace=False).tolist()
     non_train_indices = [ index for index in np.arange(M) if index not in train_indices ]
-    test_indices = np.random.choice(non_train_indices, floor(TRAIN_TEST_VALIDATION_SPLIT["TEST"] * M), replace=False)
+    test_indices = np.random.choice(non_train_indices, floor(TRAIN_TEST_VALIDATION_SPLIT["TEST"] * M), replace=False).tolist()
     validation_indices = [ index for index in np.arange(M) if index not in (train_indices + test_indices) ]
 
     patient_dataset = {
-        "malignant_train": [ malignant_patients[index] for index in train_indices ],
-        "malignant_test": [ malignant_patients[index] for index in test_indices ],
-        "malignant_cval": [ malignant_patients[index] for index in validation_indices ]
+        "malignant_train": [ (malignant_patients[index], TUMOR_MALIGNANT) for index in train_indices ],
+        "malignant_test": [ (malignant_patients[index], TUMOR_MALIGNANT) for index in test_indices ],
+        "malignant_cval": [ (malignant_patients[index], TUMOR_MALIGNANT) for index in validation_indices ]
     }    
 
+    # TODO: Code reusability here obviously poor. Split into generic helper method. 
+
     if B != M:
-        train_indices = np.random.choice(B, floor(TRAIN_TEST_VALIDATION_SPLIT["TRAIN"] * B), replace=False)
+        train_indices = np.random.choice(B, floor(TRAIN_TEST_VALIDATION_SPLIT["TRAIN"] * B), replace=False).tolist()
         non_train_indices = [ index for index in np.arange(B) if index not in train_indices ]
-        test_indices = np.randoB.choice(non_train_indices, floor(TRAIN_TEST_VALIDATION_SPLIT["TEST"] * B), replace=False)
+        test_indices = np.randoB.choice(non_train_indices, floor(TRAIN_TEST_VALIDATION_SPLIT["TEST"] * B), replace=False).tolist()
         validation_indices = [ index for index in np.arange(B) if index not in (train_indices + test_indices) ]
 
     patient_dataset.update({
-        "benign_train": [benign_patients[index] for index in train_indices],
-        "benign_test": [benign_patients[index] for index in test_indices],
-        "benign_cval": [benign_patients[index] for index in validation_indices]
+        "benign_train": [(benign_patients[index], TUMOR_BENIGN) for index in train_indices],
+        "benign_test": [(benign_patients[index], TUMOR_BENIGN) for index in test_indices],
+        "benign_cval": [(benign_patients[index], TUMOR_BENIGN) for index in validation_indices]
     })
 
     return patient_dataset

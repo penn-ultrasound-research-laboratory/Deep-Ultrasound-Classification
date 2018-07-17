@@ -187,12 +187,13 @@ def ResNet50(include_top=True, weights='imagenet',
         raise ValueError('If using `weights` as imagenet with `include_top`'
                          ' as true, `classes` should be 1000')
 
+    print(include_top)
     # Determine proper input shape
     input_shape = _obtain_input_shape(input_shape,
                                       default_size=224,
                                       min_size=197,
                                       data_format=K.image_data_format(),
-                                      include_top=include_top)
+                                      require_flatten=include_top)
 
     if input_tensor is None:
         img_input = Input(shape=input_shape)
@@ -288,14 +289,20 @@ def ResNet50(include_top=True, weights='imagenet',
 
 
 if __name__ == '__main__':
-    model = ResNet50(include_top=True, weights='imagenet')
+    model = ResNet50(
+        classes=2,
+        include_top=True, 
+        weights=None, 
+        pooling='max')
 
-    img_path = 'elephant.jpg'
-    img = image.load_img(img_path, target_size=(224, 224))
-    x = image.img_to_array(img)
-    x = np.expand_dims(x, axis=0)
-    x = preprocess_input(x)
-    print('Input image shape:', x.shape)
+    # img_path = 'elephant.jpg'
+    # img = image.load_img(img_path, target_size=(224, 224))
+    # x = image.img_to_array(img)
+    # x = np.expand_dims(x, axis=0)
+    # x = preprocess_input(x)
+    # print('Input image shape:', x.shape)
+
+    model.fit_from_generator
 
     preds = model.predict(x)
     print('Predicted:', decode_predictions(preds))

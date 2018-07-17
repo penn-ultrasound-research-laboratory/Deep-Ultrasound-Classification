@@ -1,13 +1,9 @@
 from datetime import datetime
-from constants.ultrasoundConstants import (
-    IMAGE_TYPE, HSV_COLOR_THRESHOLD, 
-    FOCUS_HASH_LABEL, FRAME_LABEL, 
-    TUMOR_TYPES, TUMOR_TYPE_LABEL, 
-    HSV_GRAYSCALE_THRESHOLD)
 from utilities.imageUtilities import determine_image_type
 from imageFocus.colorImageFocus import get_color_image_focus
 from imageFocus.grayscaleImageFocus import get_grayscale_image_focus
 from textOCR.ocr import isolate_text
+from constants.ultrasoundConstants import *
 import numpy as np
 import argparse, os, cv2, json
 
@@ -84,9 +80,6 @@ def process_patient(
                         np.array(HSV_GRAYSCALE_THRESHOLD.LOWER.value, np.uint8), 
                         np.array(HSV_GRAYSCALE_THRESHOLD.UPPER.value, np.uint8))
 
-    
-                
-
                 grayscale_image = cv2.cvtColor(bgr_image, cv2.COLOR_BGR2GRAY)
                 grayscale_image = cv2.threshold(grayscale_image, 0, 255,
                     cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
@@ -147,12 +140,12 @@ def process_patient_set(
 
     manifest_absolute_path = '{0}/manifest_{1}_{2}.json'.format(
         path_to_manifest_output_directory.rstrip('/'), 
-        (patient_type_label if patient_type_label is not None else 'UNSPEC'),
+        (patient_type_label if patient_type_label is not None else TUMOR_UNSPECIFIED),
         timestamp)
 
     failure_log_absolute_path = '{0}/failures_{1}_{2}.txt'.format(
         path_to_failures_output_directory.rstrip('/'),
-        (patient_type_label if patient_type_label is not None else 'UNSPEC'),
+        (patient_type_label if patient_type_label is not None else TUMOR_UNSPECIFIED),
         timestamp)
 
     manifest_file = open(manifest_absolute_path, 'a')
@@ -219,7 +212,6 @@ if __name__ == '__main__':
 
     parser.add_argument('-time', '--timestamp', type=str, default=None, 
         help='timestamp to use instead of generating one using the current time')
-
 
     ## Missing functionality to wipe out old folders, manifests, error logs
 
