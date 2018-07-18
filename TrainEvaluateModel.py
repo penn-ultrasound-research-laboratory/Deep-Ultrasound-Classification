@@ -31,18 +31,25 @@ if __name__ == '__main__':
 
     # classes = 2
 
-    # Instantiate the resNet50 model
-    model = ResNet50(
-        include_top=False,
-        input_shape=(None, None, 3),
-        weights=None, 
-        pooling='avg')
+    # # Instantiate the resNet50 model
+    # model = ResNet50(
+    #     include_top=False,
+    #     input_shape=(244, 244, 3),
+    #     weights=None,
+    #     pooling='max'
+    # )
+
+    # model = ResNet50(
+    #     include_top=True,
+    #     classes=2,
+    #     weights=None
+    # )
 
     patient_partition = patient_train_test_validation_split(
         arguments["benign_top_level_path"],
         arguments["malignant_top_level_path"])
 
-    patientGenerator = PatientSampleGenerator(
+    patient_sample_generator = PatientSampleGenerator(
         patient_partition["benign_train"] + patient_partition["malignant_train"],
         arguments["benign_top_level_path"],
         arguments["malignant_top_level_path"],
@@ -50,15 +57,4 @@ if __name__ == '__main__':
         IMAGE_TYPE.COLOR,
         timestamp=arguments["timestamp"])
         
-    model.compile(loss=categorical_crossentropy,
-            optimizer=Adam(),
-            metrics=['accuracy'])
-
-    # generate a partition on the patient set 
-
-    model.fit_generator(
-        next(patientGenerator),
-        steps_per_epoch=1,
-        epochs=len(patientGenerator.cleared_patients),
-        verbose=2,
-        workers=0)
+    print(patient_sample_generator)

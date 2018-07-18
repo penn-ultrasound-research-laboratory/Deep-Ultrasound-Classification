@@ -88,18 +88,16 @@ class PatientSampleGenerator:
             is_last_patient = self.patient_index == len(self.cleared_patients) - 1
             is_last_frame = self.frame_index == len(self.patient_frames) - 1
             
-            if len(loaded_image.shape) < 4 or loaded_image.shape[1] < 197 or loaded_image.shape[2] < 197:
-                print("Skipping")
-                print(loaded_image.shape)
+            if len(loaded_image.shape) < 4 or loaded_image.shape[1] < 200 or loaded_image.shape[2] < 200:
+                print("Skipping: {}".format(loaded_image.shape))
                 continue
 
-            # print("{}/{}/{}/{}".format(
-            #     (self.benign_top_level_path if patient_type == TUMOR_BENIGN else self.malignant_top_level_path),
-            #     patient_name,
-            #     ('focus' if self.timestamp is None else "focus_{}".format(self.timestamp)),
-            #     self.patient_frames[self.frame_index][FOCUS_HASH_LABEL]
-            # ))
-
+            # y = loaded_image.shape[0]
+            # x = loaded_image.shape[1]
+            # startx = x // 2 - (200 // 2)
+            # starty = y // 2 - (200 // 2)    
+            # loaded_image = loaded_image[starty:starty+200, startx:startx+200]
+        
             # print((loaded_image, frame_label) )
             print("Shape: {} | Label: {}".format(loaded_image.shape, frame_label))
             yield (loaded_image, np.array([frame_label]))
