@@ -1,13 +1,8 @@
 # -*- coding: utf-8 -*-
 '''ResNet50 model for Keras.
-
 # Reference:
-
 - [Deep Residual Learning for Image Recognition](https://arxiv.org/abs/1512.03385)
-
 Adapted from code contributed by BigMoyan.
-
-Taken from: https://github.com/fchollet/deep-learning-models/blob/master/resnet50.py
 '''
 from __future__ import print_function
 
@@ -36,6 +31,8 @@ from keras.applications.imagenet_utils import preprocess_input
 from keras.applications.imagenet_utils import _obtain_input_shape
 from keras.engine.topology import get_source_inputs
 
+import os 
+dir_path = os.path.dirname(os.path.realpath(__file__))
 
 WEIGHTS_PATH = 'https://github.com/fchollet/deep-learning-models/releases/download/v0.2/resnet50_weights_tf_dim_ordering_tf_kernels.h5'
 WEIGHTS_PATH_NO_TOP = 'https://github.com/fchollet/deep-learning-models/releases/download/v0.2/resnet50_weights_tf_dim_ordering_tf_kernels_notop.h5'
@@ -43,14 +40,12 @@ WEIGHTS_PATH_NO_TOP = 'https://github.com/fchollet/deep-learning-models/releases
 
 def identity_block(input_tensor, kernel_size, filters, stage, block):
     """The identity block is the block that has no conv layer at shortcut.
-
     # Arguments
         input_tensor: input tensor
-        kernel_size: default 3, the kernel size of middle conv layer at main path
-        filters: list of integers, the filters of 3 conv layer at main path
+        kernel_size: defualt 3, the kernel size of middle conv layer at main path
+        filters: list of integers, the filterss of 3 conv layer at main path
         stage: integer, current stage label, used for generating layer names
         block: 'a','b'..., current block label, used for generating layer names
-
     # Returns
         Output tensor for the block.
     """
@@ -81,17 +76,14 @@ def identity_block(input_tensor, kernel_size, filters, stage, block):
 
 def conv_block(input_tensor, kernel_size, filters, stage, block, strides=(2, 2)):
     """conv_block is the block that has a conv layer at shortcut
-
     # Arguments
         input_tensor: input tensor
         kernel_size: defualt 3, the kernel size of middle conv layer at main path
-        filters: list of integers, the filters of 3 conv layer at main path
+        filters: list of integers, the filterss of 3 conv layer at main path
         stage: integer, current stage label, used for generating layer names
         block: 'a','b'..., current block label, used for generating layer names
-
     # Returns
         Output tensor for the block.
-
     Note that from stage 3, the first conv layer at main path is with strides=(2,2)
     And the shortcut should have strides=(2,2) as well
     """
@@ -130,18 +122,15 @@ def ResNet50(include_top=True, weights='imagenet',
              pooling=None,
              classes=1000):
     """Instantiates the ResNet50 architecture.
-
     Optionally loads weights pre-trained
     on ImageNet. Note that when using TensorFlow,
     for best performance you should set
     `image_data_format="channels_last"` in your Keras config
     at ~/.keras/keras.json.
-
     The model and the weights are compatible with both
     TensorFlow and Theano. The data format
     convention used by the model is the one
     specified in your Keras config file.
-
     # Arguments
         include_top: whether to include the fully-connected
             layer at the top of the network.
@@ -170,10 +159,8 @@ def ResNet50(include_top=True, weights='imagenet',
         classes: optional number of classes to classify images
             into, only to be specified if `include_top` is True, and
             if no `weights` argument is specified.
-
     # Returns
         A Keras model instance.
-
     # Raises
         ValueError: in case of invalid argument for `weights`,
             or invalid input shape.
@@ -187,7 +174,6 @@ def ResNet50(include_top=True, weights='imagenet',
         raise ValueError('If using `weights` as imagenet with `include_top`'
                          ' as true, `classes` should be 1000')
 
-    print(include_top)
     # Determine proper input shape
     input_shape = _obtain_input_shape(input_shape,
                                       default_size=224,
@@ -289,20 +275,14 @@ def ResNet50(include_top=True, weights='imagenet',
 
 
 if __name__ == '__main__':
-    model = ResNet50(
-        classes=2,
-        include_top=True, 
-        weights=None, 
-        pooling='max')
+    model = ResNet50(include_top=True, weights='imagenet')
 
-    # img_path = 'elephant.jpg'
-    # img = image.load_img(img_path, target_size=(224, 224))
-    # x = image.img_to_array(img)
-    # x = np.expand_dims(x, axis=0)
-    # x = preprocess_input(x)
-    # print('Input image shape:', x.shape)
-
-    model.fit_from_generator
+    img_path = '{}/elephant.jpg'.format(dir_path)
+    img = image.load_img(img_path, target_size=(224, 224))
+    x = image.img_to_array(img)
+    x = np.expand_dims(x, axis=0)
+    x = preprocess_input(x)
+    print('Input image shape:', x.shape)
 
     preds = model.predict(x)
     print('Predicted:', decode_predictions(preds))
