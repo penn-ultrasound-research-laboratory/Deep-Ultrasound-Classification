@@ -1,50 +1,85 @@
-from constants.ultrasoundConstants import *
+from constants.ultrasoundConstants import (
+    IMAGE_TYPE,
+    IMAGE_TYPE_LABEL,
+    TUMOR_BENIGN,
+    TUMOR_MALIGNANT,
+    TUMOR_TYPE_LABEL,
+    FOCUS_HASH_LABEL)
+from constants.modelConstants import DEFAULT_BATCH_SIZE
+from utilities.imageUtilities import image_random_sampling_batch
 from keras.preprocessing.image import ImageDataGenerator
 from constants.exceptions.customExceptions import PatientSampleGeneratorException
 import numpy as np
-import cv2
+import cv2, os, json
 
 class PatientSampleGenerator:
-    '''Generator that returns batches of samples for training and evaluation
+    """Generator that returns batches of samples for training and evaluation
     
     Arguments:
         patient_list: list of patients. Patient is tuple (patientId, TUMOR_TYPE)
-        top_level_path:
-        manifest:
-        image_type:
+        benign_top_level_path: absolute path to benign directory
+        malignant_top_level_path: absolute path to malignant directory
+        manifest: dictionary parsed from JSON containing all information from image OCR, tumor types, etc
+        batch_size: (optional) number of images to output in a batch
+        image_data_generator: (optional) preprocessing generator to run on input images
+        image_type: (optional) type of image frames to process (IMAGE_TYPE Enum). i.e. grayscale or color
         timestamp: (optional) optional timestamp string to append in focus directory path. i.e. "*/focus_timestamp/*
 
     Returns:
+        Tuple containing ((batch_size, (target_shape)), [labels]) where the labels array is length batch_size 
 
-    '''
+    Raises:
+        PatientSampleGeneratorException for any error generating sample batches
+    """
 
-    def __init__(self, patient_list, benign_top_level_path, malignant_top_level_path, manifest, image_type, timestamp=None):
+    def __init__(self, 
+        patient_list, 
+        benign_top_level_path, 
+        malignant_top_level_path, 
+        manifest, 
+        batch_size=DEFAULT_BATCH_SIZE,
+        image_data_generator=None,
+        image_type=IMAGE_TYPE.COLOR, 
+        timestamp=None):
+        
         self.image_type = image_type
         self.raw_patient_list = patient_list
         self.manifest = manifest
         self.benign_top_level_path = benign_top_level_path
         self.malignant_top_level_path = malignant_top_level_path
         self.timestamp = timestamp
-        # self.grayscaleDataGenerator = ImageDataGenerator()
-        # self.colorDataGenerator = ImageDataGenerator()
+        self.image_data_generator = image_data_generator
+        self.batch_size = batch_size
 
         # Find all the patientIds with at least one frame in the specified IMAGE_TYPE
-        cleared_patients = [patient[0] for patient in self.raw_patient_list if
-                            any([frame[IMAGE_TYPE_LABEL] == self.image_type.value
-                                 for frame in self.manifest[patient[0]]])]
+
+        cleared_patients = list(filter(
+            lambda patient: any([frame[IMAGE_TYPE_LABEL] == image_type.value for frame in manifest[patient]]), 
+            [patient[0] for patient in patient_list]))
 
         if len(cleared_patients) == 0:
-            raise PatientSampleGeneratorException('No patients found with focus in image type: {0}'.format(self.image_type.value))
+            raise PatientSampleGeneratorException(
+                "No patients found with focus in image type: {0}".format(self.image_type.value))
         
         self.cleared_patients = cleared_patients
+        self.patient_index = self.frame_index = 0
 
-        self.patient_index = 0
-        self.patient_frames = [frame for frame in self.manifest[self.cleared_patients[self.patient_index]] if frame[IMAGE_TYPE_LABEL] == self.image_type.value]
-        self.frame_index = 0
-
+        self.__update_current_patient_information()
 
 
-    # def __iter__(self):
+    def __update_current_patient_information(self):
+        """Private method to update current patient information based on patient_index"""
+        self.patient_id = self.cleared_patients[self.patient_index]
+        self.patient_record = self.manifest[self.patient_id]
+        self.patient_type = self.patient_record[0][TUMOR_TYPE_LABEL]
+
+        # Find all patient's frames matching the specified image type
+
+        self.patient_frames = list(filter(
+            lambda frame: frame[IMAGE_TYPE_LABEL] == self.image_type.value,
+            self.manifest[self.cleared_patients[self.patient_index]]
+        ))
+
 
     def __next__(self):
 
@@ -53,28 +88,22 @@ class PatientSampleGenerator:
 
         while not (is_last_patient and is_last_frame):
 
-            patient_name = self.cleared_patients[self.patient_index]
-            patient_record = self.manifest[patient_name]
-            patient_type = patient_record[0][TUMOR_TYPE_LABEL]
-
-            # Only supporting pre-classified training samples. No support for unspecified patients. 
-
-            print("{}/{}/{}/{}".format(
-                (self.benign_top_level_path if patient_type == TUMOR_BENIGN else self.malignant_top_level_path),
-                patient_name,
-                ('focus' if self.timestamp is None else "focus_{}".format(self.timestamp)),
-                self.patient_frames[self.frame_index][FOCUS_HASH_LABEL]
-            ))
-
             loaded_image = cv2.imread("{}/{}/{}/{}".format(
-                (self.benign_top_level_path if patient_type == TUMOR_BENIGN else self.malignant_top_level_path),
-                patient_name,
-                ('focus' if self.timestamp is None else "focus_{}".format(self.timestamp)),
+                (self.benign_top_level_path if self.patient_type == TUMOR_BENIGN else self.malignant_top_level_path),
+                self.patient_id,
+                ("focus" if self.timestamp is None else "focus_{}".format(self.timestamp)),
                 self.patient_frames[self.frame_index][FOCUS_HASH_LABEL]
             ),
                 (cv2.IMREAD_COLOR if self.image_type.value == IMAGE_TYPE.COLOR.value else cv2.IMREAD_GRAYSCALE))
 
-            loaded_image = np.expand_dims(loaded_image, axis=0)
+            # Produce a randomly sampled batch from the focus image
+
+            min_non_channel_dim = np.min(loaded_image.shape[:2]) # assumes image format channel_last
+            raw_image_batch = image_random_sampling_batch(
+                loaded_image, 
+                target_shape=(min_non_channel_dim, min_non_channel_dim, 3),
+                batch_size=self.batch_size)
+
             frame_label = self.patient_frames[self.frame_index][TUMOR_TYPE_LABEL]
             frame_label = 0 if frame_label == TUMOR_BENIGN else 1
 
@@ -82,24 +111,57 @@ class PatientSampleGenerator:
                 self.frame_index += 1
             else:
                 self.patient_index += 1
-                self.patient_frames = [frame for frame in self.manifest[self.cleared_patients[self.patient_index]] if frame[IMAGE_TYPE_LABEL] == self.image_type.value]
                 self.frame_index = 0
+                self.__update_current_patient_information()
 
             is_last_patient = self.patient_index == len(self.cleared_patients) - 1
             is_last_frame = self.frame_index == len(self.patient_frames) - 1
             
-            if len(loaded_image.shape) < 4 or loaded_image.shape[1] < 200 or loaded_image.shape[2] < 200:
-                print("Skipping: {}".format(loaded_image.shape))
+            if len(loaded_image.shape) < 3 or loaded_image.shape[0] < 100 or loaded_image.shape[1] < 100:
                 continue
 
-            # y = loaded_image.shape[0]
-            # x = loaded_image.shape[1]
-            # startx = x // 2 - (200 // 2)
-            # starty = y // 2 - (200 // 2)    
-            # loaded_image = loaded_image[starty:starty+200, startx:startx+200]
-        
-            # print((loaded_image, frame_label) )
-            print("Shape: {} | Label: {}".format(loaded_image.shape, frame_label))
-            yield (loaded_image, np.array([frame_label]))
+            yield (raw_image_batch, [frame_label] * self.batch_size)
 
         return
+
+if __name__ == "__main__":
+
+    dirname = os.path.dirname(__file__)
+
+    with open(os.path.abspath("processedData//manifest_COMPLETE_2018-07-11_18-51-03.json"), "r") as fp:
+        manifest = json.load(fp)
+
+    patient_sample_generator = next(PatientSampleGenerator(
+        [("00BER3003855", "BENIGN"), ("01PER2043096", "BENIGN")],
+        os.path.join(dirname, "../../100_Cases/ComprehensiveMaBenign/Benign"),
+        os.path.join(dirname, "../../100_Cases/ComprehensiveMaBenign/Malignant"),
+        manifest,
+        image_type=IMAGE_TYPE.COLOR,
+        timestamp="2018-07-11_18-51-03"))
+
+    # gen = 
+    raw_image_batch, labels = next(patient_sample_generator)
+
+    for i in range(16):
+        cv2.imshow(str(labels[i]), raw_image_batch[i])
+        cv2.waitKey(0)    
+
+    raw_image_batch, labels = next(patient_sample_generator)
+
+
+    for i in range(16):
+        cv2.imshow(str(labels[i]), raw_image_batch[i])
+        cv2.waitKey(0)    
+
+    raw_image_batch, labels = next(patient_sample_generator)
+
+
+    for i in range(16):
+        cv2.imshow(str(labels[i]), raw_image_batch[i])
+        cv2.waitKey(0)    
+
+    raw_image_batch, labels = next(patient_sample_generator)
+
+    for i in range(16):
+        cv2.imshow(str(labels[i]), raw_image_batch[i])
+        cv2.waitKey(0)    
