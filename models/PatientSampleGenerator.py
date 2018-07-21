@@ -83,10 +83,18 @@ class PatientSampleGenerator:
 
     def __next__(self):
 
-        is_last_patient = self.patient_index == len(self.cleared_patients) - 1
-        is_last_frame = self.frame_index == len(self.patient_frames) - 1
+        while True:
 
-        while not (is_last_patient and is_last_frame):
+
+            skip_flag = False
+            is_last_frame = self.frame_index == len(self.patient_frames) - 1
+
+            # print("{}/{}/{}/{}".format(
+            #     (self.benign_top_level_path if self.patient_type == TUMOR_BENIGN else self.malignant_top_level_path),
+            #     self.patient_id,
+            #     ("focus" if self.timestamp is None else "focus_{}".format(self.timestamp)),
+            #     self.patient_frames[self.frame_index][FOCUS_HASH_LABEL]
+            # ))
 
             loaded_image = cv2.imread("{}/{}/{}/{}".format(
                 (self.benign_top_level_path if self.patient_type == TUMOR_BENIGN else self.malignant_top_level_path),
@@ -96,16 +104,23 @@ class PatientSampleGenerator:
             ),
                 (cv2.IMREAD_COLOR if self.image_type.value == IMAGE_TYPE.COLOR.value else cv2.IMREAD_GRAYSCALE))
 
-            # Produce a randomly sampled batch from the focus image
+            if loaded_image is None:
+                skip_flag = True
+            elif len(loaded_image.shape) < 3 or loaded_image.shape[0] < 224 or loaded_image.shape[1] < 224:
+                # print(loaded_image.shape)
+                skip_flag = True
+            else:
+                print("Training on patient: {} | frame: {}".format(self.patient_id, self.frame_index))
+                # Produce a randomly sampled batch from the focus image
 
-            min_non_channel_dim = np.min(loaded_image.shape[:2]) # assumes image format channel_last
-            raw_image_batch = image_random_sampling_batch(
-                loaded_image, 
-                target_shape=(min_non_channel_dim, min_non_channel_dim, 3),
-                batch_size=self.batch_size)
+                min_non_channel_dim = np.min(loaded_image.shape[:2]) # assumes image format channel_last
+                raw_image_batch = image_random_sampling_batch(
+                    loaded_image, 
+                    target_shape=(224, 224, 3),
+                    batch_size=self.batch_size)
 
-            frame_label = self.patient_frames[self.frame_index][TUMOR_TYPE_LABEL]
-            frame_label = 0 if frame_label == TUMOR_BENIGN else 1
+                frame_label = self.patient_frames[self.frame_index][TUMOR_TYPE_LABEL]
+                frame_label = 0 if frame_label == TUMOR_BENIGN else 1
 
             if not is_last_frame:
                 self.frame_index += 1
@@ -113,14 +128,12 @@ class PatientSampleGenerator:
                 self.patient_index += 1
                 self.frame_index = 0
                 self.__update_current_patient_information()
-
-            is_last_patient = self.patient_index == len(self.cleared_patients) - 1
-            is_last_frame = self.frame_index == len(self.patient_frames) - 1
-            
-            if len(loaded_image.shape) < 3 or loaded_image.shape[0] < 100 or loaded_image.shape[1] < 100:
+           
+            if not skip_flag:
+                print("Batch shape: {} | label: {}".format(raw_image_batch.shape, frame_label))
+                yield (raw_image_batch, np.repeat(frame_label, self.batch_size))
+            else:
                 continue
-
-            yield (raw_image_batch, [frame_label] * self.batch_size)
 
         return
 

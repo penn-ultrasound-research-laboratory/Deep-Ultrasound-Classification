@@ -29,22 +29,6 @@ if __name__ == '__main__':
     with open(arguments["manifest_path"], 'r') as f:
         manifest = json.load(f) 
 
-    # classes = 2
-
-    # # Instantiate the resNet50 model
-    # model = ResNet50(
-    #     include_top=False,
-    #     input_shape=(244, 244, 3),
-    #     weights=None,
-    #     pooling='max'
-    # )
-
-    # model = ResNet50(
-    #     include_top=True,
-    #     classes=2,
-    #     weights=None
-    # )
-
     patient_partition = patient_train_test_validation_split(
         arguments["benign_top_level_path"],
         arguments["malignant_top_level_path"])
@@ -54,7 +38,36 @@ if __name__ == '__main__':
         arguments["benign_top_level_path"],
         arguments["malignant_top_level_path"],
         manifest,
-        IMAGE_TYPE.COLOR,
+        batch_size=16,
+        image_type=IMAGE_TYPE.COLOR, 
         timestamp=arguments["timestamp"])
-        
-    print(patient_sample_generator)
+
+    # print(next(next(patient_sample_generator))[0].shape)
+
+    # classes = 2
+
+    # Instantiate the resNet50 model
+    # model = ResNet50(
+    #     include_top=False,
+    #     input_shape=(200, 200, 3),
+    #     weights=None,
+    #     pooling='max'
+    # )
+
+    model = ResNet50(
+        include_top=True,
+        classes=2,
+        weights=None
+    )
+
+
+    model.compile(loss=categorical_crossentropy,
+                optimizer=Adam(),
+                metrics=['accuracy'])
+
+
+    model.fit_generator(next(patient_sample_generator), steps_per_epoch=1, epochs=10, verbose=2)
+
+
+    # gen = next(patient_sample_generator)
+    # print(next(gen)[0].shape)
