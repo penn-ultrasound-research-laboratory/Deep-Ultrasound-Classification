@@ -33,8 +33,16 @@ class READOUT_ABBREVS(Enum):
 TUMOR_UNSPECIFIED = 'UNSPEC'
 TUMOR_BENIGN = 'BENIGN'
 TUMOR_MALIGNANT = 'MALIGNANT'
-
 TUMOR_TYPES = [TUMOR_BENIGN, TUMOR_MALIGNANT]
+
+def tumor_integer_label(tumor_type):
+    if tumor_type == TUMOR_BENIGN:
+        return 0
+    elif tumor_type == TUMOR_MALIGNANT:
+        return 1
+    else:
+        return 2
+
 TUMOR_TYPE_LABEL = 'TUMOR_TYPE'
 
 WALL_FILTER_MODES = ['LOW', 'MED', 'HIGH']
