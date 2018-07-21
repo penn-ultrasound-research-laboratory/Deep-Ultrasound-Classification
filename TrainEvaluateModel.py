@@ -1,8 +1,9 @@
 import argparse, json
+import numpy as np
 from models.resNet50 import ResNet50
 from models.patientsPartition import patient_train_test_validation_split
 from models.PatientSampleGenerator import PatientSampleGenerator
-from constants.ultrasoundConstants import *
+from constants.ultrasoundConstants import IMAGE_TYPE
 from keras.losses import categorical_crossentropy
 from keras.optimizers import Adam
 
@@ -29,15 +30,54 @@ if __name__ == '__main__':
     with open(arguments["manifest_path"], 'r') as f:
         manifest = json.load(f) 
 
-    # classes = 2
+    partition = patient_train_test_validation_split(
+        arguments["benign_top_level_path"],
+        arguments["malignant_top_level_path"])
 
-    # # Instantiate the resNet50 model
-    # model = ResNet50(
-    #     include_top=False,
-    #     input_shape=(244, 244, 3),
-    #     weights=None,
-    #     pooling='max'
-    # )
+    # THESE SHOULD PROBABLY BE ZIPERED TOGETHER
+
+    training_partition = partition["benign_train"] + partition["malignant_train"]
+    validation_partition = partition["benign_cval"] + partition["malignant_cval"]
+
+    np.random.shuffle(training_partition)
+    np.random.shuffle(validation_partition)
+
+    training_sample_generator = PatientSampleGenerator(
+        training_partition,
+        arguments["benign_top_level_path"],
+        arguments["malignant_top_level_path"],
+        manifest,
+        target_shape=np.array([200, 200]),
+        number_channels=3,
+        batch_size=16,
+        image_type=IMAGE_TYPE.COLOR, 
+        timestamp=arguments["timestamp"])
+
+    validation_sample_generator = PatientSampleGenerator(
+        validation_partition,
+        arguments["benign_top_level_path"],
+        arguments["malignant_top_level_path"],
+        manifest,
+        target_shape=np.array([200, 200]),
+        number_channels=3,
+        batch_size=16,
+        image_type=IMAGE_TYPE.COLOR, 
+        timestamp=arguments["timestamp"])
+
+
+    # print(next(next(training_sample_generator))[0].shape)
+
+    # SHOULD PROBABLY JUST BE USING THE MODEL TO PRODUCE FEATURES AS FEED-IN TO 
+    # LINEAR SVM CONSIDERING THE DATA IS SMALL AND EXTREMELY DIFFERENT FROM TRAINING
+
+    # Instantiate the resNet50 model
+    model = ResNet50(
+        include_top=False,
+        input_shape=(200, 200, 3),
+        weights=None,
+        pooling='max'
+    )
+
 
     # model = ResNet50(
     #     include_top=True,
@@ -45,16 +85,23 @@ if __name__ == '__main__':
     #     weights=None
     # )
 
-    patient_partition = patient_train_test_validation_split(
-        arguments["benign_top_level_path"],
-        arguments["malignant_top_level_path"])
+    model.summary()
 
-    patient_sample_generator = PatientSampleGenerator(
-        patient_partition["benign_train"] + patient_partition["malignant_train"],
-        arguments["benign_top_level_path"],
-        arguments["malignant_top_level_path"],
-        manifest,
-        IMAGE_TYPE.COLOR,
-        timestamp=arguments["timestamp"])
-        
-    print(patient_sample_generator)
+
+    # With a categorical crossentropy loss function, the network outputs must be categorical 
+    model.compile(loss=categorical_crossentropy,
+                optimizer=Adam(),
+                metrics=['accuracy'])
+
+
+    model.fit_generator(
+        next(training_sample_generator), 
+        steps_per_epoch=1, 
+        validation_data=next(validation_sample_generator),
+        validation_steps=1,
+        epochs=5, 
+        verbose=2,
+        use_multiprocessing=True)
+
+    # gen = next(patient_sample_generator)
+    # print(next(gen)[0].shape)µ
