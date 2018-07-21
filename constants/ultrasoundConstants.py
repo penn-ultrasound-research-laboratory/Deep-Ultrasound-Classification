@@ -36,9 +36,9 @@ TUMOR_MALIGNANT = 'MALIGNANT'
 TUMOR_TYPES = [TUMOR_BENIGN, TUMOR_MALIGNANT]
 
 def tumor_integer_label(tumor_type):
-    if tumor_type is TUMOR_BENIGN:
+    if tumor_type == TUMOR_BENIGN:
         return 0
-    elif tumor_type is TUMOR_MALIGNANT:
+    elif tumor_type == TUMOR_MALIGNANT:
         return 1
     else:
         return 2
