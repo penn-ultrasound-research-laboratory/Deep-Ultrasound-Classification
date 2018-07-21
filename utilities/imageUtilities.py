@@ -48,23 +48,36 @@ def center_crop(image, target_shape, origin=None):
         column_offset: column_offset + width]
 
 
-def image_random_sampling_batch(image, target_shape, batch_size=16):
+def image_random_sampling_batch(
+    image, 
+    target_shape=None, 
+    batch_size=16,
+    use_min_dimension=False):
     """Randomly sample an image to produce sample batch 
 
     Arguments:
-        image: image to sample
-        target_shape: np.array containing image shape
+        image: image to sample in channels_last format
+        target_shape: (optional) np.array containing image shape
         batch_size: (optional) number of sample to generate in image batch
+        use_min_dimension: (optional) boolean indicating to use the minimum shape dimension 
+            as the cropping dimension. Must be True if target_shape is None. Will override 
+            target_shape regardless of shape value.
     Returns:
         4D array containing sampled images in axis=0. 
 
     Raises: 
         ValueError: the target_shape is greater than the actual image shape in at least one dimension
     """
+    try:
+        if target_shape is None and use_min_dimension is False:
+            raise ValueError("Use minimum dimension must be True with no target shape specified")
 
-    try:       
-        if np.max(target_shape) > np.max(image.shape):
+        if target_shape is not None and np.max(target_shape) > np.max(image.shape):
             raise ValueError("Target shape exceeds input image by at least one dimension")
+
+        if use_min_dimension is True:
+            minimum_dimension = np.min(image.shape[:2])
+            target_shape = np.array([minimum_dimension, minimum_dimension])
 
         # Compute valid origin range
         row_origin_max = image.shape[0] - target_shape[0]
@@ -87,13 +100,22 @@ def image_random_sampling_batch(image, target_shape, batch_size=16):
 if __name__ == "__main__":
 
     batch_size=10
-    a = cv2.imread("models/elephant.jpg", cv2.IMREAD_COLOR)
+    elephant = cv2.imread("models/elephant.jpg", cv2.IMREAD_COLOR)
 
-    min_dim = np.min(a.shape[:2])
-    print(min_dim)
-    b = image_random_sampling_batch(a, [400, 400, 3], batch_size=batch_size)
-    print(b.shape)
+    random_batch = image_random_sampling_batch(
+        elephant, 
+        target_shape=[150, 150, 3], 
+        batch_size=batch_size)
+    
+    for i in range(batch_size):
+        cv2.imshow("mini", random_batch[i])
+        cv2.waitKey(0)
+
+    random_batch_max = image_random_sampling_batch(
+        elephant, 
+        use_min_dimension=True,
+        batch_size=batch_size)
 
     for i in range(batch_size):
-        cv2.imshow("mini", b[i])
+        cv2.imshow("mini", random_batch_max[i])
         cv2.waitKey(0)

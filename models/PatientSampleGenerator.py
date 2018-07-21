@@ -6,9 +6,10 @@ from constants.ultrasoundConstants import (
     TUMOR_TYPE_LABEL,
     FOCUS_HASH_LABEL)
 from constants.modelConstants import DEFAULT_BATCH_SIZE
+from constants.ultrasoundConstants import tumor_integer_label
+from constants.exceptions.customExceptions import PatientSampleGeneratorException
 from utilities.imageUtilities import image_random_sampling_batch
 from keras.preprocessing.image import ImageDataGenerator
-from constants.exceptions.customExceptions import PatientSampleGeneratorException
 from keras.utils import to_categorical
 import numpy as np
 import cv2, os, json
@@ -39,8 +40,10 @@ class PatientSampleGenerator:
         malignant_top_level_path, 
         manifest, 
         batch_size=DEFAULT_BATCH_SIZE,
-        image_data_generator=None,
-        image_type=IMAGE_TYPE.COLOR, 
+        image_data_generator=None, 
+        image_type=IMAGE_TYPE.COLOR,
+        number_channels=3, 
+        target_shape=None,
         timestamp=None):
         
         self.image_type = image_type
@@ -51,6 +54,8 @@ class PatientSampleGenerator:
         self.timestamp = timestamp
         self.image_data_generator = image_data_generator
         self.batch_size = batch_size
+        self.target_shape = target_shape
+        self.number_channels = number_channels
 
         # Find all the patientIds with at least one frame in the specified IMAGE_TYPE
 
@@ -75,7 +80,6 @@ class PatientSampleGenerator:
         self.patient_type = self.patient_record[0][TUMOR_TYPE_LABEL]
 
         # Find all patient's frames matching the specified image type
-
         self.patient_frames = list(filter(
             lambda frame: frame[IMAGE_TYPE_LABEL] == self.image_type.value,
             self.manifest[self.cleared_patients[self.patient_index]]
@@ -106,15 +110,16 @@ class PatientSampleGenerator:
                 # print("Training on patient: {} | frame: {}".format(self.patient_id, self.frame_index))
 
                 # Produce a randomly sampled batch from the focus image
-
                 min_non_channel_dim = np.min(loaded_image.shape[:2]) # assumes image format channel_last
+                
                 raw_image_batch = image_random_sampling_batch(
                     loaded_image, 
                     target_shape=(224, 224, 3),
                     batch_size=self.batch_size)
 
-                frame_label = self.patient_frames[self.frame_index][TUMOR_TYPE_LABEL]
-                frame_label = 0 if frame_label == TUMOR_BENIGN else 1
+                # Convert the tumor string label to integer label
+                frame_label = tumor_integer_label(
+                    self.patient_frames[self.frame_index][TUMOR_TYPE_LABEL])
 
             if not is_last_frame:
                 self.frame_index += 1
@@ -131,6 +136,8 @@ class PatientSampleGenerator:
                 continue
 
         return
+
+
 
 if __name__ == "__main__":
 
