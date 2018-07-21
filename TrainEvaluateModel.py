@@ -1,8 +1,9 @@
 import argparse, json
+import numpy as np
 from models.resNet50 import ResNet50
 from models.patientsPartition import patient_train_test_validation_split
 from models.PatientSampleGenerator import PatientSampleGenerator
-from constants.ultrasoundConstants import *
+from constants.ultrasoundConstants import IMAGE_TYPE
 from keras.losses import categorical_crossentropy
 from keras.optimizers import Adam
 
@@ -29,12 +30,18 @@ if __name__ == '__main__':
     with open(arguments["manifest_path"], 'r') as f:
         manifest = json.load(f) 
 
-    patient_partition = patient_train_test_validation_split(
+    partition = patient_train_test_validation_split(
         arguments["benign_top_level_path"],
         arguments["malignant_top_level_path"])
 
-    patient_sample_generator = PatientSampleGenerator(
-        patient_partition["benign_train"] + patient_partition["malignant_train"],
+    training_partition = partition["benign_train"] + partition["malignant_train"]
+    validation_partition = partition["benign_cval"] + partition["malignant_cval"]
+
+    np.random.shuffle(training_partition)
+    np.random.shuffle(validation_partition)
+
+    training_sample_generator = PatientSampleGenerator(
+        training_partition,
         arguments["benign_top_level_path"],
         arguments["malignant_top_level_path"],
         manifest,
@@ -42,7 +49,17 @@ if __name__ == '__main__':
         image_type=IMAGE_TYPE.COLOR, 
         timestamp=arguments["timestamp"])
 
-    # print(next(next(patient_sample_generator))[0].shape)
+    validation_sample_generator = PatientSampleGenerator(
+        validation_partition,
+        arguments["benign_top_level_path"],
+        arguments["malignant_top_level_path"],
+        manifest,
+        batch_size=16,
+        image_type=IMAGE_TYPE.COLOR, 
+        timestamp=arguments["timestamp"])
+
+
+    # print(next(next(training_sample_generator))[0].shape)
 
     # classes = 2
 
@@ -61,13 +78,20 @@ if __name__ == '__main__':
     )
 
 
+    # With a categorical crossentropy loss function, the network outputs must be categorical 
     model.compile(loss=categorical_crossentropy,
                 optimizer=Adam(),
                 metrics=['accuracy'])
 
 
-    model.fit_generator(next(patient_sample_generator), steps_per_epoch=1, epochs=10, verbose=2)
-
+    model.fit_generator(
+        next(training_sample_generator), 
+        steps_per_epoch=1, 
+        validation_data=next(validation_sample_generator),
+        validation_steps=1,
+        epochs=100, 
+        verbose=2,
+        use_multiprocessing=True)
 
     # gen = next(patient_sample_generator)
-    # print(next(gen)[0].shape)
+    # print(next(gen)[0].shape)µ

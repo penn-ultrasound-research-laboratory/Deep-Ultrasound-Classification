@@ -9,6 +9,7 @@ from constants.modelConstants import DEFAULT_BATCH_SIZE
 from utilities.imageUtilities import image_random_sampling_batch
 from keras.preprocessing.image import ImageDataGenerator
 from constants.exceptions.customExceptions import PatientSampleGeneratorException
+from keras.utils import to_categorical
 import numpy as np
 import cv2, os, json
 
@@ -85,16 +86,8 @@ class PatientSampleGenerator:
 
         while True:
 
-
             skip_flag = False
             is_last_frame = self.frame_index == len(self.patient_frames) - 1
-
-            # print("{}/{}/{}/{}".format(
-            #     (self.benign_top_level_path if self.patient_type == TUMOR_BENIGN else self.malignant_top_level_path),
-            #     self.patient_id,
-            #     ("focus" if self.timestamp is None else "focus_{}".format(self.timestamp)),
-            #     self.patient_frames[self.frame_index][FOCUS_HASH_LABEL]
-            # ))
 
             loaded_image = cv2.imread("{}/{}/{}/{}".format(
                 (self.benign_top_level_path if self.patient_type == TUMOR_BENIGN else self.malignant_top_level_path),
@@ -110,7 +103,8 @@ class PatientSampleGenerator:
                 # print(loaded_image.shape)
                 skip_flag = True
             else:
-                print("Training on patient: {} | frame: {}".format(self.patient_id, self.frame_index))
+                # print("Training on patient: {} | frame: {}".format(self.patient_id, self.frame_index))
+
                 # Produce a randomly sampled batch from the focus image
 
                 min_non_channel_dim = np.min(loaded_image.shape[:2]) # assumes image format channel_last
@@ -129,9 +123,10 @@ class PatientSampleGenerator:
                 self.frame_index = 0
                 self.__update_current_patient_information()
            
+            # Class outputs must be categorical. 
             if not skip_flag:
                 print("Batch shape: {} | label: {}".format(raw_image_batch.shape, frame_label))
-                yield (raw_image_batch, np.repeat(frame_label, self.batch_size))
+                yield (raw_image_batch, to_categorical(np.repeat(frame_label, self.batch_size), num_classes=2))
             else:
                 continue
 
