@@ -48,19 +48,22 @@ class PatientSampleGenerator:
         image_type=IMAGE_TYPE.COLOR,
         number_channels=3, 
         target_shape=None,
-        timestamp=None):
+        timestamp=None,
+        kill_on_last_patient=False,
+        use_categorical=False):
         
         self.raw_patient_list = patient_list
         self.manifest = manifest
         self.benign_top_level_path = benign_top_level_path
         self.malignant_top_level_path = malignant_top_level_path
-
         self.image_type = image_type
         self.timestamp = timestamp
         self.image_data_generator = image_data_generator
         self.batch_size = batch_size
         self.target_shape = target_shape
         self.number_channels = number_channels
+        self.kill_on_last_patient = kill_on_last_patient
+        self.use_categorical = use_categorical
 
         # Find all the patientIds with at least one frame in the specified IMAGE_TYPE
 
@@ -131,6 +134,10 @@ class PatientSampleGenerator:
             if not is_last_frame:
                 self.frame_index += 1
             elif is_last_patient:
+
+                if self.kill_on_last_patient:
+                    raise StopIteration("Reached the last patient. Terminating PatientSampleGenerator.")
+
                 self.patient_index = 0
                 self.frame_index = 0
                 self.__update_current_patient_information()
@@ -141,8 +148,11 @@ class PatientSampleGenerator:
            
             # Class outputs must be categorical. 
             if not skip_flag:
-                print("Patient: {} | label: {}".format(self.patient_id, frame_label))
-                yield (raw_image_batch, to_categorical(np.repeat(frame_label, self.batch_size), num_classes=2048))
+                print("Patient: {} | Frame: {} | label: {}".format(self.patient_id, self.frame_index, frame_label))
+                if self.use_categorical:
+                    yield (raw_image_batch, to_categorical(np.repeat(frame_label, self.batch_size), num_classes=2))
+                else:
+                    yield (raw_image_batch, np.repeat(frame_label, self.batch_size))
             else:
                 continue
 
