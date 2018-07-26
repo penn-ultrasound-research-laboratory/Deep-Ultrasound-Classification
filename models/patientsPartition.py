@@ -7,7 +7,9 @@ from math import floor
 import numpy as np
 import os
 
-def patient_train_test_validation_split(benign_top_level_path, malignant_top_level_path):
+def patient_train_test_validation_split(
+    benign_top_level_path, 
+    malignant_top_level_path):
     """Allocate patients to training, test, validation sets. 
 
     The directory structure of the ultrasound data is split into Malignant and Benign
