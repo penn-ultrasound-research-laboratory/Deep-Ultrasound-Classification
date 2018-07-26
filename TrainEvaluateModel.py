@@ -4,27 +4,55 @@ import tensorflow as tf
 from models.resNet50 import ResNet50
 from models.patientsPartition import patient_train_test_validation_split
 from models.PatientSampleGenerator import PatientSampleGenerator
+from keras.preprocessing.image import ImageDataGenerator
 from constants.ultrasoundConstants import IMAGE_TYPE
 from keras.losses import categorical_crossentropy
 from keras.optimizers import Adam
 from keras.models import Model
+
+def extract_save_patient_features():
+    """Builds and saves a Numpy dataset
+    
+    Arguments:
+        benign_top_level_path: absolute path to benign directory
+        malignant_top_level_path: absolute path to malignant directory
+        manifest_path: absolute path to JSON containing all information from image OCR, tumor types, etc
+        output_directory_path: absolute path to output directory
+        image_data_generator: (optional) preprocessing generator to run on input images
+        image_type: (optional) type of image frames to process (IMAGE_TYPE Enum). i.e. grayscale or color
+        number_channels (optional) number of color channels. Should be 3 if color, 1 if grayscale. 
+            3 by default to match image_type=COLOR default
+        target_shape: (optional) array containing target shape to use for output samples
+        timestamp: (optional) optional timestamp string to append in focus directory path. i.e. "*/focus_timestamp/*
+
+    Returns:
+        Tuple containing numpy arrays ((batch_size, (target_shape)), [labels]) 
+            where the labels array is length batch_size 
+
+    Raises:
+        PatientSampleGeneratorException for any error generating sample batches
+    """
 
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
 
     parser.add_argument('benign_top_level_path',
-        help='absolute path to top level directory containing benign patient folders')
-    
+                        help='absolute path to top level directory containing benign patient folders')
+
     parser.add_argument('malignant_top_level_path',
-        help='absolute path to top level directory containing malignant patient folders')
-    
+                        help='absolute path to top level directory containing malignant patient folders')
+
     parser.add_argument('manifest_path',
-        help="absolute path to complete manifest file (merged benign and malignant manifests")
+                        help="absolute path to complete manifest file (merged benign and malignant manifests")
+
+    parser.add_argument("output_directory_path",
+                        help="absolute path to complete output directory for generated features and labels")
 
     parser.add_argument('-T', '--timestamp', type=str,
-        default=None,
-        help="String timestamp to use as prefix to focus directory and manifest directory")
+                        default=None,
+                        help="String timestamp to use as prefix to focus directory and manifest directory")
+
 
     arguments = vars(parser.parse_args())
 
@@ -39,6 +67,14 @@ if __name__ == '__main__':
     # Constants
 
     NUMBER_SAMPLES_PER_BATCH = 16
+
+    # Image Augmentation function
+
+    image_data_generator = ImageDataGenerator(
+        samplewise_center=True,
+        samplewise_std_normalization=True,
+        zca_whitening=True,
+        horizontal_flip=True)
 
     # Partition the data into train, test, validate
 
@@ -166,6 +202,17 @@ if __name__ == '__main__':
     print("Training Shape: {} | {}".format(X_training.shape, y_training.shape))
     print("Test Shape: {} | {}".format(X_test.shape, y_test.shape))
     print("Validation Shape: {} | {}".format(X_validation.shape, y_validation.shape))
+
+
+    # Save all feature, labels files to directory here. 
+
+
+
+
+
+
+
+
 
     # SHOULD PROBABLY JUST BE USING THE MODEL TO PRODUCE FEATURES AS FEED-IN TO 
     # LINEAR SVM CONSIDERING THE DATA IS SMALL AND EXTREMELY DIFFERENT FROM TRAINING

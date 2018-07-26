@@ -57,7 +57,7 @@ def image_random_sampling_batch(
 
     Arguments:
         image: image to sample in channels_last format
-        target_shape: (optional) np.array containing image shape
+        target_shape: (optional) np.array containing image shape. Must be square - e.g. [200, 200]
         batch_size: (optional) number of sample to generate in image batch
         use_min_dimension: (optional) boolean indicating to use the minimum shape dimension 
             as the cropping dimension. Must be True if target_shape is None. Will override 
@@ -72,10 +72,8 @@ def image_random_sampling_batch(
         if target_shape is None and use_min_dimension is False:
             raise ValueError("Use minimum dimension must be True with no target shape specified")
 
-        if target_shape is not None and np.max(target_shape) > np.max(image.shape):
-            raise ValueError("Target shape exceeds input image by at least one dimension")
-
-        if use_min_dimension is True:
+        # Use the minimum dimension if any dimension of image shape is less than the target shape
+        if use_min_dimension is True or (target_shape is not None and np.min(target_shape) > np.min(image.shape[:2])):
             minimum_dimension = np.min(image.shape[:2])
             target_shape = np.array([minimum_dimension, minimum_dimension])
 
