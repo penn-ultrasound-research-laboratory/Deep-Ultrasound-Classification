@@ -5,7 +5,10 @@ from constants.ultrasoundConstants import (
     TUMOR_MALIGNANT,
     TUMOR_TYPE_LABEL,
     FOCUS_HASH_LABEL)
-from constants.modelConstants import DEFAULT_BATCH_SIZE
+from constants.modelConstants import (
+    DEFAULT_BATCH_SIZE,
+    SAMPLE_WIDTH,
+    SAMPLE_HEIGHT)
 from constants.ultrasoundConstants import tumor_integer_label
 from constants.exceptions.customExceptions import PatientSampleGeneratorException
 from utilities.imageUtilities import image_random_sampling_batch
@@ -112,18 +115,15 @@ class PatientSampleGenerator:
                 (cv2.IMREAD_COLOR if self.image_type.value == IMAGE_TYPE.COLOR.value else cv2.IMREAD_GRAYSCALE))
 
             if loaded_image is None or len(loaded_image.shape) < 2:
+                print("Skipping due to corruption: {} | frame: {}".format(self.patient_id, self.patient_frames[self.frame_index][FOCUS_HASH_LABEL]))
                 # Stored image is corrupted. Skip to next frame. 
                 skip_flag = True
             else:
-                print("Training on patient: {} | frame: {}".format(self.patient_id, self.frame_index))
-
                 raw_image_batch = image_random_sampling_batch(
                     loaded_image, 
                     target_shape=self.target_shape,
                     use_min_dimension=(self.target_shape is None),
                     batch_size=self.batch_size)
-
-                print("Generated raw image batch size: {}".format(raw_image_batch.shape))
 
                 # Weird indexing is due to shape mismatches between specified target shape 
                 # and extra dimension of batch size. Determine row/column padding
@@ -167,7 +167,7 @@ class PatientSampleGenerator:
            
             # Class outputs must be categorical. 
             if not skip_flag:
-                print("Patient: {} | Frame: {} | label: {}".format(self.patient_id, self.frame_index, frame_label))
+                print("Training on patient: {} | frame: {}".format(self.patient_id, self.patient_frames[self.frame_index][FOCUS_HASH_LABEL]))
                 if self.use_categorical:
                     yield (padded_image_batch, to_categorical(np.repeat(frame_label, self.batch_size), num_classes=2))
                 else:
