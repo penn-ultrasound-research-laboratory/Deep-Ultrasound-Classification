@@ -1,6 +1,8 @@
 *.png
 *.jpg
 
+*.npy
+
 __pycache__
 *.py[cod]
 
