@@ -3,3 +3,6 @@ class PatientSampleGeneratorException(Exception):
 
 class ExtractSavePatientFeatureException(Exception):
     """Error extracting and saving patient feature to file"""
+
+class TrainEvaluateLinearClassifierException(Exception):
+    """Error training and evaluating linear classifier"""

@@ -320,18 +320,7 @@ if __name__ == '__main__':
     # print(feature_columns[:3])
 
     # # Estimator using the default optimizer.
-    # estimator = tf.estimator.LinearClassifier(
-    #     feature_columns=feature_columns,
-    #     n_classes=2)
 
-    # estimator.train(
-    #     input_fn=next(training_sample_generator))
-
-    # estimator.evaluate(
-    #     input_fn=next(validation_sample_generator))
-
-    # estimator.predict(
-    #     input_fn=next(test_sample_generator))
 
     # predictions = model.predict_generator(
     #     next(training_sample_generator), 
