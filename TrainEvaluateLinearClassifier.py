@@ -29,29 +29,42 @@ def train_evaluate_linear_classifier(path_to_numpy_data_file):
         feature_columns=feature_columns,
         n_classes=2)
 
-    print("Beginning Training....")
-    estimator.train(
-        input_fn = get_input_fn(
-            data["training_features"], 
-            data["training_labels"],
+    experiment = tf.contrib.learn.Experiment(
+        estimator,
+        get_input_fn(
+            np.concatenate((data["training_features"], data["validation_features"]), axis=0), 
+            np.concatenate((data["training_labels"], data["validation_labels"]), axis=0),
             shuffle=True),
-        steps = 1000)
-
-
-    estimator.evaluate(
-        input_fn = get_input_fn(
-            data["validation_features"], 
-            data["validation_labels"],
-            shuffle=False,
-            num_epochs=1),
-        steps = 1000)
-
-    predictions = estimator.predict(
-        input_fn = get_input_fn(
+        get_input_fn(
             data["test_features"], 
             data["test_labels"],
             shuffle=False,
-            num_epochs=1))
+            num_epochs=1),
+        train_steps=2000)
+
+    experiment.train_and_evaluate()
+    # estimator.train(
+    #     input_fn = get_input_fn(
+    #         data["training_features"], 
+    #         data["training_labels"],
+    #         shuffle=True),
+    #     steps = 1000)
+
+
+    # estimator.evaluate(
+    #     input_fn = get_input_fn(
+    #         data["validation_features"], 
+    #         data["validation_labels"],
+    #         shuffle=False,
+    #         num_epochs=1),
+    #     steps = 1000)
+
+    # predictions = estimator.predict(
+    #     input_fn = get_input_fn(
+    #         data["test_features"], 
+    #         data["test_labels"],
+    #         shuffle=False,
+    #         num_epochs=1))
 
 
 if __name__ == "__main__":
