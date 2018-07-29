@@ -3,7 +3,7 @@ import numpy as np
 import tensorflow as tf
 from constants.exceptions.customExceptions import ExtractSavePatientFeatureException
 from models.resNet50 import ResNet50
-from models.patientsPartition import patient_train_test_validation_split
+from utilities.patientsPartition import patient_train_test_validation_split
 from models.PatientSampleGenerator import PatientSampleGenerator
 from keras.preprocessing.image import ImageDataGenerator
 from constants.ultrasoundConstants import (
@@ -12,6 +12,7 @@ from constants.ultrasoundConstants import (
     NUMBER_CHANNELS_GRAYSCALE)
 from constants.modelConstants import (
     DEFAULT_BATCH_SIZE,
+    RESNET50_REQUIRED_NUMBER_CHANNELS,
     SAMPLE_WIDTH,
     SAMPLE_HEIGHT)
 from keras.losses import categorical_crossentropy
@@ -58,7 +59,7 @@ def extract_save_patient_features(
         
         base_model = ResNet50(
             include_top=False,
-            input_shape=tuple(target_shape) + (number_channels,),
+            input_shape=tuple(target_shape) + (RESNET50_REQUIRED_NUMBER_CHANNELS,),
             weights='imagenet',
             pooling='avg')
 
