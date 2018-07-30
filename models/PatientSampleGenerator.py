@@ -146,28 +146,8 @@ class PatientSampleGenerator:
                 raw_image_batch = image_random_sampling_batch(
                     loaded_image, 
                     target_shape=self.target_shape,
-                    use_min_dimension=(self.target_shape is None),
+                    upscale_to_target=True,
                     batch_size=self.batch_size)
-
-                # Weird indexing is due to shape mismatches between specified target shape 
-                # and extra dimension of batch size. Determine row/column padding
-                # Target shape is [rows, columns]
-                # Image batch shape is [batch_size, rows, columns]
-
-                pad_rows = np.max(self.target_shape[0]-raw_image_batch.shape[1], 0)
-                pad_cols = np.max(self.target_shape[1]-raw_image_batch.shape[2], 0)
-
-                padding_tuple = (
-                    (0, 0),
-                    (pad_rows // 2, pad_rows // 2 + pad_rows % 2), 
-                    (pad_cols // 2, pad_cols // 2 + pad_cols % 2),
-                    (0, 0))
-                
-                padded_image_batch = np.pad(
-                    raw_image_batch,
-                    padding_tuple,
-                    "constant",
-                    constant_values=0)
 
                 # Convert the tumor string label to integer label
                 frame_label = tumor_integer_label(self.patient_frames[self.frame_index][TUMOR_TYPE_LABEL])
@@ -191,9 +171,9 @@ class PatientSampleGenerator:
             if not skip_flag:
                 print("Training on patient: {} | color: {} | frame: {}".format(self.patient_id, current_frame_color, self.patient_frames[self.frame_index][FOCUS_HASH_LABEL]))
                 if self.use_categorical:
-                    yield (padded_image_batch, to_categorical(np.repeat(frame_label, self.batch_size), num_classes=2))
+                    yield (raw_image_batch, to_categorical(np.repeat(frame_label, self.batch_size), num_classes=2))
                 else:
-                    yield (padded_image_batch, np.repeat(frame_label, self.batch_size))
+                    yield (raw_image_batch, np.repeat(frame_label, self.batch_size))
             else:
                 continue
 
@@ -226,32 +206,9 @@ if __name__ == "__main__":
         batch_size=BATCH_SIZE
     ))
     
-    raw_image_batch, labels = next(patient_sample_generator)
+    for p in range(10):
+        raw_image_batch, labels = next(patient_sample_generator)
 
-    for i in range(BATCH_SIZE):
-        cv2.imshow(str(labels[i]), raw_image_batch[i])
-        cv2.waitKey(0)    
-
-    raw_image_batch, labels = next(patient_sample_generator)
-
-    for i in range(BATCH_SIZE):
-        cv2.imshow(str(labels[i]), raw_image_batch[i])
-        cv2.waitKey(0)    
-
-    raw_image_batch, labels = next(patient_sample_generator)
-
-    for i in range(BATCH_SIZE):
-        cv2.imshow(str(labels[i]), raw_image_batch[i])
-        cv2.waitKey(0)    
-
-    raw_image_batch, labels = next(patient_sample_generator)
-
-    for i in range(BATCH_SIZE):
-        cv2.imshow(str(labels[i]), raw_image_batch[i])
-        cv2.waitKey(0)    
-
-    raw_image_batch, labels = next(patient_sample_generator)
-
-    for i in range(BATCH_SIZE):
-        cv2.imshow(str(labels[i]), raw_image_batch[i])
-        cv2.waitKey(0)    
+        for i in range(BATCH_SIZE):
+            cv2.imshow(str(labels[i]), raw_image_batch[i])
+            cv2.waitKey(0)    
