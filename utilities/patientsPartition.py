@@ -139,12 +139,17 @@ if __name__ == "__main__":
         type=str,
         help="Path to malignant top level directory")
 
-    args = vars(parser.parse_args())
+    args = parser.parse_args()
 
     index_dictionary = patient_train_test_validation_split(
-        args["benign_top_level_path"],
-        args["malignant_top_level_path"],
+        args.benign_top_level_path,
+        args.malignant_top_level_path,
         include_validation = False)
 
-    print(index_dictionary.keys()) 
-    print(len(index_dictionary))
+    all_patients = set()
+    for key in index_dictionary.keys():
+        for patient in index_dictionary[key]:
+            all_patients.add(patient[0])
+
+    # Set size should be the length of all patients (each patient used exactly once)
+    print(len(all_patients))
