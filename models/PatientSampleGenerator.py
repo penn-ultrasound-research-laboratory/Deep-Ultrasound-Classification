@@ -152,21 +152,21 @@ class PatientSampleGenerator:
                 # Convert the tumor string label to integer label
                 frame_label = tumor_integer_label(self.patient_frames[self.frame_index][TUMOR_TYPE_LABEL])
 
-            # Optional image preprocessing
-            if self.image_data_generator is not None:
+                # Optional image preprocessing
+                if self.image_data_generator is not None:
 
-                self.image_data_generator.fit(
-                    raw_image_batch,
-                    augment=True,
-                    rounds=10,
-                    seed=None)
+                    self.image_data_generator.fit(
+                        raw_image_batch,
+                        augment=True,
+                        rounds=10,
+                        seed=None)
 
-                gen = self.image_data_generator.flow(
-                    raw_image_batch,
-                    batch_size=self.batch_size, 
-                    shuffle=True)
+                    gen = self.image_data_generator.flow(
+                        raw_image_batch,
+                        batch_size=self.batch_size, 
+                        shuffle=True)
 
-                raw_image_batch = next(gen)
+                    raw_image_batch = next(gen)
 
             if not is_last_frame:
 

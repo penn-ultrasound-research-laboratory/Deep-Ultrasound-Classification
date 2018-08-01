@@ -32,8 +32,8 @@ def train_evaluate_linear_classifier(path_to_numpy_data_file):
     experiment = tf.contrib.learn.Experiment(
         estimator,
         get_input_fn(
-            np.concatenate((data["training_features"], data["validation_features"]), axis=0), 
-            np.concatenate((data["training_labels"], data["validation_labels"]), axis=0),
+            data["training_features"], 
+            data["training_labels"],
             shuffle=True),
         get_input_fn(
             data["test_features"], 

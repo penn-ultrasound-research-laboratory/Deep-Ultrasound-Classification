@@ -26,8 +26,7 @@ def extract_save_patient_features(
     output_directory_path,
     batch_size=DEFAULT_BATCH_SIZE,
     image_data_generator=None,
-    image_type=IMAGE_TYPE.COLOR,
-    number_channels=3,
+    image_type=IMAGE_TYPE.ALL,
     target_shape=[SAMPLE_HEIGHT, SAMPLE_WIDTH],
     timestamp=None):
     """Builds and saves a Numpy dataset with Resnet extracted features
@@ -40,8 +39,6 @@ def extract_save_patient_features(
         batch_size: (optional) number of samples to take from each input frame (default 16)
         image_data_generator: (optional) preprocessing generator to run on input images
         image_type: (optional) type of image frames to process (IMAGE_TYPE Enum). i.e. grayscale or color
-        number_channels (optional) number of color channels. Should be 3 if color, 1 if grayscale. 
-            3 by default to match image_type=COLOR default
         target_shape: (optional) array containing target shape to use for output samples [rows, columns]. 
             No channel dimension.
         timestamp: (optional) optional timestamp string to append in focus directory path. 
@@ -57,37 +54,42 @@ def extract_save_patient_features(
 
     try:
         
+        # When include_top=True input shape must be 224,224
         base_model = ResNet50(
-            include_top=False,
+            include_top=True,
             input_shape=tuple(target_shape) + (RESNET50_REQUIRED_NUMBER_CHANNELS,),
-            weights='imagenet',
-            pooling='avg')
+            weights='imagenet')
 
+        # Pre-softmax layer may be way too late
         model = Model(
             input=base_model.input,
-            output=base_model.get_layer('global_average_pooling2d_1').output)
+            output=base_model.get_layer('fc1000').output)
         
         # Load the patient manifest
         with open(manifest_path, 'r') as f:
             manifest = json.load(f) 
 
-        # Generate a random patient partition. Split the partition the data into train, test, validate.
+        # Generate a random patient partition. Split the partition the data into train and test partitions.
         # Shuffle the patients as best practice to prevent even out training over classes
 
         partition = patient_train_test_validation_split(
             benign_top_level_path,
-            malignant_top_level_path)
+            malignant_top_level_path,
+            include_validation = False)
+
+        image_data_generator = ImageDataGenerator(
+            featurewise_center=True,
+            featurewise_std_normalization=True,
+            horizontal_flip=True,
+            vertical_flip=True)
 
         training_partition = partition["benign_train"] + partition["malignant_train"]
-        validation_partition = partition["benign_cval"] + partition["malignant_cval"]
         test_partition = partition["benign_test"] + partition["malignant_test"]
 
         np.random.shuffle(training_partition)
-        np.random.shuffle(validation_partition)
         np.random.shuffle(test_partition)
 
         print("Training Partition: {}".format(len(training_partition)))
-        print("Validation Partition: {}".format(len(validation_partition)))
         print("Test Partition: {}".format(len(test_partition)))
 
         # PatientSampleGenerator over the training patients
@@ -97,57 +99,24 @@ def extract_save_patient_features(
             benign_top_level_path,
             malignant_top_level_path,
             manifest,
-            target_shape=target_shape,
-            number_channels=number_channels,
-            batch_size=batch_size,
-            image_type=image_type, 
-            timestamp=timestamp,
-            kill_on_last_patient=True)
-
-        validation_sample_generator = PatientSampleGenerator(
-            validation_partition,
-            benign_top_level_path,
-            malignant_top_level_path,
-            manifest,
-            target_shape=target_shape,
-            number_channels=number_channels,
-            batch_size=batch_size,
-            image_type=image_type, 
-            timestamp=timestamp,
-            kill_on_last_patient=True)
+            target_shape = target_shape,
+            batch_size = batch_size,
+            image_type = image_type,
+            image_data_generator = image_data_generator,
+            timestamp = timestamp,
+            kill_on_last_patient = True)
 
         test_sample_generator = PatientSampleGenerator(
             test_partition,
             benign_top_level_path,
             malignant_top_level_path,
             manifest,
-            target_shape=target_shape,
-            number_channels=number_channels,
-            batch_size=batch_size,
-            image_type=image_type, 
-            timestamp=timestamp,
-            kill_on_last_patient=True)
-
-        X_validation = y_validation = None
-        try:
-            gen = next(validation_sample_generator)
-            while True:
-                current_batch = next(gen)
-                current_predictions = model.predict(current_batch[0])
-
-                X_validation = current_predictions if X_validation is None else np.concatenate((
-                    X_validation, 
-                    current_predictions), 
-                    axis=0)
-
-                y_validation = current_batch[1] if y_validation is None else np.concatenate((
-                    y_validation,
-                    current_batch[1]),
-                    axis=0)
-
-        except Exception as e:
-            print(e)
-
+            target_shape = target_shape,
+            batch_size = batch_size,
+            image_type = image_type,
+            image_data_generator = image_data_generator,
+            timestamp = timestamp,
+            kill_on_last_patient = True)
 
         X_training = y_training = None
         try:
@@ -199,8 +168,8 @@ def extract_save_patient_features(
                 "test_labels": y_test,
                 "training_features": X_training,
                 "training_labels": y_training,
-                "validation_features": X_validation,
-                "validation_labels": y_validation
+                "training_partition": training_partition,
+                "test_partition": test_partition
             }
             np.save(f, data)
             print("Saved generated features to output directory. Output hash: {}".format(output_hash))
@@ -217,68 +186,59 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     parser.add_argument('benign_top_level_path',
-                        help='absolute path to top level directory containing benign patient folders')
+                        help = 'absolute path to top level directory containing benign patient folders')
 
     parser.add_argument('malignant_top_level_path',
-                        help='absolute path to top level directory containing malignant patient folders')
+                        help = 'absolute path to top level directory containing malignant patient folders')
 
     parser.add_argument('manifest_path',
-                        help="absolute path to complete manifest file (merged benign and malignant manifests")
+                        help = "absolute path to complete manifest file (merged benign and malignant manifests")
 
     parser.add_argument("output_directory_path",
-                        help="absolute path to complete output directory for generated features and labels")
+                        help = "absolute path to complete output directory for generated features and labels")
 
     parser.add_argument("-bs",
                         "--batch_size",
-                        type=int,
-                        default=DEFAULT_BATCH_SIZE,
-                        help="Number of samples to extract from each input frame")
+                        type = int,
+                        default = DEFAULT_BATCH_SIZE,
+                        help = "Number of samples to extract from each input frame")
 
     parser.add_argument("-idg",
                         "--image_data_generator",
-                        type=ImageDataGenerator,
-                        default=None,
-                        help="Keras ImageDataGenerator to preprocess sample image data")
+                        type = ImageDataGenerator,
+                        default = None,
+                        help = "Keras ImageDataGenerator to preprocess sample image data")
 
-    # TODO: For now only support building dataset on either grayscale or color. Not both at the same time. Should build
-    # support into this application
     parser.add_argument("-it",
                         "--image_type",
-                        type=IMAGE_TYPE,
-                        default=IMAGE_TYPE.COLOR,
-                        help="Image class to consider in manifest")
-
-    parser.add_argument("-nc",
-                        "--number_channels",
-                        type=int,
-                        default=NUMBER_CHANNELS_COLOR,
-                        help="Number of channels for image type (# color format channels)")
+                        type = IMAGE_TYPE,
+                        default = IMAGE_TYPE.ALL,
+                        help = "Image class to consider in manifest")
 
     parser.add_argument("-ts",
                         "--target_shape",
-                        type=list,
-                        default=[SAMPLE_HEIGHT, SAMPLE_WIDTH],
-                        help="Size to use for image samples of taken frames. Used to pad frames that are smaller the target shape, and crop-sample images that are larger than the target shape")
+                        type = list,
+                        default = [SAMPLE_HEIGHT, SAMPLE_WIDTH],
+                        help = "Size to use for image samples of taken frames. Used to pad frames that are smaller the target shape, and crop-sample images that are larger than the target shape")
 
     parser.add_argument('-T', '--timestamp',
-                        type=str,
-                        default=None,
-                        help="String timestamp to use as prefix to focus directory and manifest directory")
+                        type = str,
+                        default = None,
+                        help = "String timestamp to use as prefix to focus directory and manifest directory")
 
-    args = vars(parser.parse_args())
+    args = parser.parse_args()
 
     try:
         code = extract_save_patient_features(
-            args["benign_top_level_path"],
-            args["malignant_top_level_path"],
-            args["manifest_path"],
-            args["output_directory_path"],
-            batch_size=args["batch_size"],
-            image_data_generator=args["image_data_generator"],
-            image_type=args["image_type"],
-            number_channels=args["number_channels"],
-            target_shape=args["target_shape"],
-            timestamp=args["timestamp"])
+            args.benign_top_level_path,
+            args.malignant_top_level_path,
+            args.manifest_path,
+            args.output_directory_path,
+            batch_size = args.batch_size,
+            image_data_generator = args.image_data_generator,
+            image_type = args.image_type,
+            target_shape = args.target_shape,
+            timestamp = args.timestamp)
 
     except Exception as e:
         raise(e)
