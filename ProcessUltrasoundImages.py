@@ -215,14 +215,14 @@ if __name__ == '__main__':
 
     ## Missing functionality to wipe out old folders, manifests, error logs
 
-    args = vars(parser.parse_args())
+    args = parser.parse_args()
 
     process_patient_set(
-        args['path_to_top_level_directory'],
-        args['relative_path_to_frames_directory'],
-        args['relative_path_to_focus_output_folder'],
-        args['path_to_manifest_output_directory'], 
-        args['path_to_failures_output_directory'],
-        args['patient_type_label'],
-        args['timestamp'])
+        args.path_to_top_level_directory,
+        args.relative_path_to_frames_directory,
+        args.relative_path_to_focus_output_folder,
+        args.path_to_manifest_output_directory, 
+        args.path_to_failures_output_directory,
+        args.patient_type_label,
+        args.timestamp)
 

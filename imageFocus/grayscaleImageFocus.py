@@ -1,7 +1,11 @@
-import argparse, uuid
+import argparse
+import uuid
 import cv2
+import pytesseract
 import numpy as np
-
+from constants.ultrasoundConstants import (
+    HSV_GRAYSCALE_THRESHOLD)
+from matplotlib import pyplot as plt
 
 def get_grayscale_image_focus(path_to_image, path_to_output_directory, HSV_lower_bound, HSV_upper_bound):
     '''
@@ -30,6 +34,7 @@ def get_grayscale_image_focus(path_to_image, path_to_output_directory, HSV_lower
         # Then, threshold the HSV image to get only target border color
         bgr_image = cv2.imread(path_to_image, cv2.IMREAD_COLOR)
         bgr_image = bgr_image[70:, 90:]
+    
         mask = cv2.inRange(
             bgr_image, 
             HSV_lower_bound, 
@@ -78,6 +83,12 @@ def get_grayscale_image_focus(path_to_image, path_to_output_directory, HSV_lower
 
         cropped_image = focus_image[y+3:y+h-3, x+3:x+w-3]
 
+        plt.show()
+        # # Get verbose data including boxes, confidences, line and page numbers
+        print(pytesseract.image_to_data(cropped_image, lang='eng',
+		config='--psm 11 -c tessedit_char_whitelist=0123456789.'))
+
+
         output_path = '{0}/{1}.png'.format(path_to_output_directory, uuid.uuid4())
 
         cv2.imwrite(output_path, cropped_image)
@@ -105,4 +116,4 @@ if __name__ == '__main__':
         args['image'],
         '.', 
         np.array(HSV_GRAYSCALE_THRESHOLD.LOWER.value, np.uint8), 
-        HSV_upper_bound)
+        np.array(HSV_GRAYSCALE_THRESHOLD.UPPER.value, np.uint8))
