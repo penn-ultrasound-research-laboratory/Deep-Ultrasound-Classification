@@ -28,8 +28,6 @@ class PatientSampleGenerator:
         batch_size: (optional) number of images to output in a batch
         image_data_generator: (optional) preprocessing generator to run on input images
         image_type: (optional) type of image frames to process (IMAGE_TYPE Enum). i.e. grayscale or color
-        number_channels (optional) number of color channels. Should be 3 if color, 1 if grayscale. 
-            3 by default to match image_type=COLOR default
         target_shape: (optional) array containing target shape to use for output samples
         timestamp: (optional) optional timestamp string to append in focus directory path. i.e. "*/focus_timestamp/*
 
@@ -48,8 +46,7 @@ class PatientSampleGenerator:
         manifest, 
         batch_size=DEFAULT_BATCH_SIZE,
         image_data_generator=None, 
-        image_type=IMAGE_TYPE.COLOR,
-        number_channels=3, 
+        image_type=IMAGE_TYPE.ALL,
         target_shape=None,
         timestamp=None,
         kill_on_last_patient=False,
@@ -64,15 +61,17 @@ class PatientSampleGenerator:
         self.image_data_generator = image_data_generator
         self.batch_size = batch_size
         self.target_shape = target_shape
-        self.number_channels = number_channels
         self.kill_on_last_patient = kill_on_last_patient
         self.use_categorical = use_categorical
 
         # Find all the patientIds with at least one frame in the specified IMAGE_TYPE
-
-        cleared_patients = list(filter(
-            lambda patient: any([frame[IMAGE_TYPE_LABEL] == image_type.value for frame in manifest[patient]]), 
-            [patient[0] for patient in patient_list]))
+        # Patient list is unfiltered if IMAGE_TYPE.ALL
+        if image_type is IMAGE_TYPE.ALL:
+            cleared_patients = [patient[0] for patient in patient_list]
+        else:
+            cleared_patients = list(filter(
+                lambda patient: any([frame[IMAGE_TYPE_LABEL] == image_type.value for frame in manifest[patient]]), 
+                [patient[0] for patient in patient_list]))
 
         if len(cleared_patients) == 0:
             raise PatientSampleGeneratorException(
@@ -91,28 +90,53 @@ class PatientSampleGenerator:
         self.patient_record = self.manifest[self.patient_id]
         self.patient_type = self.patient_record[0][TUMOR_TYPE_LABEL]
 
-        # Find all patient's frames matching the specified image type
-        self.patient_frames = list(filter(
-            lambda frame: frame[IMAGE_TYPE_LABEL] == self.image_type.value,
-            self.manifest[self.cleared_patients[self.patient_index]]
-        ))
+        all_patient_frames = self.manifest[self.cleared_patients[self.patient_index]]
 
+        # Find all patient's frames matching the specified image type
+        if self.image_type is IMAGE_TYPE.ALL:
+            self.patient_frames = all_patient_frames
+        else:
+            self.patient_frames = [
+                frame for frame in all_patient_frames if frame[IMAGE_TYPE_LABEL] == self.image_type.value]
 
     def __next__(self):
 
         while True:
 
             skip_flag = False
+
+            current_frame_color = self.patient_frames[self.frame_index][IMAGE_TYPE_LABEL]
             is_last_frame = self.frame_index == len(self.patient_frames) - 1
             is_last_patient = self.patient_index == len(self.cleared_patients) - 1
 
+
+
+            top_level_path = (
+                self.benign_top_level_path if self.patient_type == TUMOR_BENIGN 
+                else self.malignant_top_level_path)
+
+            focus_directory = (
+                "focus" if self.timestamp is None 
+                else "focus_{}".format(self.timestamp))
+
+            color_mode = (
+                cv2.IMREAD_COLOR if current_frame_color == IMAGE_TYPE.COLOR.value
+                else cv2.IMREAD_GRAYSCALE)
+
             loaded_image = cv2.imread("{}/{}/{}/{}".format(
-                (self.benign_top_level_path if self.patient_type == TUMOR_BENIGN else self.malignant_top_level_path),
+                top_level_path,
                 self.patient_id,
-                ("focus" if self.timestamp is None else "focus_{}".format(self.timestamp)),
-                self.patient_frames[self.frame_index][FOCUS_HASH_LABEL]
-            ),
-                (cv2.IMREAD_COLOR if self.image_type.value == IMAGE_TYPE.COLOR.value else cv2.IMREAD_GRAYSCALE))
+                focus_directory,
+                self.patient_frames[self.frame_index][FOCUS_HASH_LABEL]),
+                color_mode)
+
+            # All images are processed as RGB
+            # TODO: Verify that this makes sense with channel ordering. I thought OpenCV 
+            # typically used GBR and not RGB
+
+            if current_frame_color == IMAGE_TYPE.GRAYSCALE.value:
+                loaded_image = cv2.cvtColor(loaded_image, cv2.COLOR_GRAY2RGB)
+
 
             if loaded_image is None or len(loaded_image.shape) < 2:
                 print("Skipping due to corruption: {} | frame: {}".format(self.patient_id, self.patient_frames[self.frame_index][FOCUS_HASH_LABEL]))
@@ -122,36 +146,32 @@ class PatientSampleGenerator:
                 raw_image_batch = image_random_sampling_batch(
                     loaded_image, 
                     target_shape=self.target_shape,
-                    use_min_dimension=(self.target_shape is None),
+                    upscale_to_target=True,
                     batch_size=self.batch_size)
-
-                # Weird indexing is due to shape mismatches between specified target shape 
-                # and extra dimension of batch size. Determine row/column padding
-                # Target shape is [rows, columns]
-                # iImage batch shape is [batch_size, rows, columns]
-
-                pad_rows = np.max(self.target_shape[0]-raw_image_batch.shape[1], 0)
-                pad_cols = np.max(self.target_shape[1]-raw_image_batch.shape[2], 0)
-
-                padding_tuple = (
-                    (0, 0),
-                    (pad_rows // 2, pad_rows // 2 + pad_rows % 2), 
-                    (pad_cols // 2, pad_cols // 2 + pad_cols % 2))
-                
-                if self.image_type is IMAGE_TYPE.COLOR:
-                    padding_tuple += ((0,0),)
-
-                padded_image_batch = np.pad(
-                    raw_image_batch,
-                    padding_tuple,
-                    "constant",
-                    constant_values=0)
 
                 # Convert the tumor string label to integer label
                 frame_label = tumor_integer_label(self.patient_frames[self.frame_index][TUMOR_TYPE_LABEL])
 
+                # Optional image preprocessing
+                if self.image_data_generator is not None:
+
+                    self.image_data_generator.fit(
+                        raw_image_batch,
+                        augment=True,
+                        rounds=10,
+                        seed=None)
+
+                    gen = self.image_data_generator.flow(
+                        raw_image_batch,
+                        batch_size=self.batch_size, 
+                        shuffle=True)
+
+                    raw_image_batch = next(gen)
+
             if not is_last_frame:
+
                 self.frame_index += 1
+            
             elif is_last_patient:
 
                 if self.kill_on_last_patient:
@@ -167,11 +187,11 @@ class PatientSampleGenerator:
            
             # Class outputs must be categorical. 
             if not skip_flag:
-                print("Training on patient: {} | frame: {}".format(self.patient_id, self.patient_frames[self.frame_index][FOCUS_HASH_LABEL]))
+                print("Training on patient: {} | color: {} | frame: {}".format(self.patient_id, current_frame_color, self.patient_frames[self.frame_index][FOCUS_HASH_LABEL]))
                 if self.use_categorical:
-                    yield (padded_image_batch, to_categorical(np.repeat(frame_label, self.batch_size), num_classes=2))
+                    yield (raw_image_batch, to_categorical(np.repeat(frame_label, self.batch_size), num_classes=2))
                 else:
-                    yield (padded_image_batch, np.repeat(frame_label, self.batch_size))
+                    yield (raw_image_batch, np.repeat(frame_label, self.batch_size))
             else:
                 continue
 
@@ -187,8 +207,10 @@ if __name__ == "__main__":
         manifest = json.load(fp)
 
     image_data_generator = ImageDataGenerator(
-        samplewise_center=True,
-        samplewise_std_normalization=True)
+        featurewise_center = True,
+        featurewise_std_normalization = True,
+        horizontal_flip = True,
+        vertical_flip = True)
 
     BATCH_SIZE = 5
 
@@ -198,33 +220,15 @@ if __name__ == "__main__":
         os.path.join(dirname, "../../100_Cases/ComprehensiveMaBenign/Malignant"),
         manifest,
         target_shape=[200, 200],
-        number_channels=1,
-        image_type=IMAGE_TYPE.GRAYSCALE,
+        image_type=IMAGE_TYPE.ALL,
         image_data_generator=image_data_generator,
         timestamp="2018-07-11_18-51-03",
         batch_size=BATCH_SIZE
     ))
     
-    raw_image_batch, labels = next(patient_sample_generator)
+    for p in range(10):
+        raw_image_batch, labels = next(patient_sample_generator)
 
-    for i in range(BATCH_SIZE):
-        cv2.imshow(str(labels[i]), raw_image_batch[i])
-        cv2.waitKey(0)    
-
-    raw_image_batch, labels = next(patient_sample_generator)
-
-    for i in range(BATCH_SIZE):
-        cv2.imshow(str(labels[i]), raw_image_batch[i])
-        cv2.waitKey(0)    
-
-    raw_image_batch, labels = next(patient_sample_generator)
-
-    for i in range(BATCH_SIZE):
-        cv2.imshow(str(labels[i]), raw_image_batch[i])
-        cv2.waitKey(0)    
-
-    raw_image_batch, labels = next(patient_sample_generator)
-
-    for i in range(BATCH_SIZE):
-        cv2.imshow(str(labels[i]), raw_image_batch[i])
-        cv2.waitKey(0)    
+        for i in range(BATCH_SIZE):
+            cv2.imshow(str(labels[i]), raw_image_batch[i])
+            cv2.waitKey(0)    
