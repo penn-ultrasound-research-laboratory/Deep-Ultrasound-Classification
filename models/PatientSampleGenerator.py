@@ -168,6 +168,22 @@ class PatientSampleGenerator:
 
                     raw_image_batch = next(gen)
 
+                # Always augment by providing several common gradient transforms on the input
+                # Randomly sample an images from the batch and generate gradients from the batch 
+
+                print(self)
+                cv2.imshow('img', raw_image_batch[np.random.randint(self.batch_size)])
+                cv2.waitKey(0)
+
+                gradient_batch = np.stack([
+                    cv2.Laplacian(raw_image_batch[np.random.randint(self.batch_size)], cv2.CV_64F),
+                    cv2.Sobel(raw_image_batch[np.random.randint(self.batch_size)], cv2.CV_64F, 1, 0, ksize=3),
+                    cv2.Sobel(raw_image_batch[np.random.randint(self.batch_size)], cv2.CV_64F, 0, 1, ksize=3)
+                ], 
+                axis=0)
+
+                raw_image_batch = np.concatenate((raw_image_batch, gradient_batch), axis=0)
+
             if not is_last_frame:
 
                 self.frame_index += 1
@@ -229,6 +245,6 @@ if __name__ == "__main__":
     for p in range(10):
         raw_image_batch, labels = next(patient_sample_generator)
 
-        for i in range(BATCH_SIZE):
+        for i in range(len(raw_image_batch)):
             cv2.imshow(str(labels[i]), raw_image_batch[i])
             cv2.waitKey(0)    
