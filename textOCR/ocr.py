@@ -1,7 +1,9 @@
 # import the necessary packages
 from constants.ultrasoundConstants import IMAGE_TYPE, READOUT_ABBREVS, WALL_FILTER_MODES
 from PIL import Image
+import numpy as np
 import os, re, cv2, argparse, pytesseract, uuid
+
 
 RADIALITY = READOUT_ABBREVS.RADIALITY.value
 COLOR_TYPE = READOUT_ABBREVS.COLOR_TYPE.value
@@ -12,6 +14,7 @@ CPA = READOUT_ABBREVS.CPA.value
 COLOR_LEVEL = READOUT_ABBREVS.COLOR_LEVEL.value
 WALL_FILTER = READOUT_ABBREVS.WALL_FILTER.value
 PRF = READOUT_ABBREVS.PULSE_REPITITION_FREQUENCY.value
+SCALE = READOUT_ABBREVS.SCALE.value
 SIZE = READOUT_ABBREVS.SIZE.value
 
 def isolate_text(grayscale_image, image_type):
@@ -21,18 +24,18 @@ def isolate_text(grayscale_image, image_type):
 	# Attempt to crop the top section 
 	left_bar_crop= grayscale_image[50:, :100]
 	bottom_left_crop = grayscale_image[350:, 30:140]
-	# color_bar_crop = grayscale_image[50:, 595:]
+	scale_crop = grayscale_image[15:40, 585:]
 
-	# write the grayscale image to disk as a temporary file so we can
-	# apply OCR to it
+	# write the grayscale image to disk as a temporary file so we can apply OCR to it
+
 	left_bar_filename = "{}.png".format(uuid.uuid4())
 	cv2.imwrite(left_bar_filename, left_bar_crop)
 
 	bottom_left_filename = '{}.png'.format(uuid.uuid4())
 	cv2.imwrite(bottom_left_filename, bottom_left_crop)
 
-	# color_bar_filename = '{}.png'.format(uuid.uuid4())
-	# cv2.imwrite(color_bar_filename, color_bar_crop)
+	scale_crop_filename = '{}.png'.format(uuid.uuid4())
+	cv2.imwrite(scale_crop_filename, scale_crop)
 
 	# load the image as a PIL/Pillow image, apply OCR, and then delete
 	# the temporary file. Tesseract segmentation mode 11 is critical for this to work
@@ -50,17 +53,35 @@ def isolate_text(grayscale_image, image_type):
 		boxes=False,  
 		config='--psm 11 -c tessedit_char_whitelist=0123456789.') 
 
-	# raw_text_color_bar = pytesseract.image_to_string(Image.open(color_bar_filename),
-	# 	lang='eng',
-	# 	boxes=False,  
-	# 	config='--psm 11 -c tessedit_char_whitelist=0123456789.') 
+	# Specifically whitelist numerical characters and '.' to aid the OCR engine
+
+	raw_text_scale = pytesseract.image_to_string(Image.open(scale_crop_filename),
+		lang='eng',
+		boxes=False,  
+		config='--psm 11 -c tessedit_char_whitelist=0123456789.') 
 
 	os.remove(left_bar_filename)
 	os.remove(bottom_left_filename)
-	# os.remove(color_bar_filename)
+	os.remove(scale_crop_filename)
 
 	text_segments = raw_text.splitlines()
 	text_segments = [segment.upper().strip() for segment in text_segments if segment is not '']
+
+	# Isolate the frame scale (e.g. 2.4 cm, 3.9 cm)
+
+	scale_segments = raw_text_scale.splitlines()
+	scale_segments = [segment.upper().strip() for segment in scale_segments if segment is not '']
+	scale_segments = [max(re.findall(r'[\d.]+', segment), key=len) for segment in scale_segments]
+	scale_segments = [float(ns) for ns in scale_segments]
+
+	# scale must be between 1 and 10 (cm). Use base 10 as check. Use None as placeholder 
+	# to infer scale mean at a later stage 
+
+	base_10_mag = np.log10(max(scale_segments))
+	if base_10_mag > 0 and base_10_mag < 1:
+		FOUND_TEXT[SCALE] = max(scale_segments)
+	else:
+		FOUND_TEXT[SCALE] = None			
 
 	# Determine radiality
 
@@ -157,5 +178,5 @@ if __name__ == '__main__':
 	gray = cv2.threshold(gray, 0, 255,
 		cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
 		
-	isolate_text(gray, IMAGE_TYPE.COLOR)
+	print(isolate_text(gray, IMAGE_TYPE.COLOR))
 
