@@ -70,9 +70,9 @@ def process_patient(
 
     found_text_records = []
     for frame in frames:
-        print("Attempting frame: {0}".format(frame))
+        print("Attempting frame: {}".format(frame))
         try: 
-            path_to_frame = "{0}/{1}".format(absolute_path_to_frame_directory, frame)
+            path_to_frame = "{}/{}".format(absolute_path_to_frame_directory, frame)
             bgr_image = cv2.imread(path_to_frame, cv2.IMREAD_COLOR)
 
             # Determine whether the frame is color or grayscale
@@ -111,12 +111,12 @@ def process_patient(
 
             except Exception as e:
                 # Image focus acquisition failed. Bubble up the error with frame information.
-                raise Exception("[{0}, {1}, {2}] | {3}".format(patient_label, frame, image_type, e))
+                raise Exception("[{}, {}, {}] | {}".format(patient_label, frame, image_type, e))
 
         except Exception as e:
                 
             # Write the specific error in the failure log. Progress to the next frame
-            failure_log_file_pointer.write("{0}\n".format(e))
+            failure_log_file_pointer.write("{}\n".format(e))
             continue
 
         # Dump all valid records to the manifest
@@ -131,7 +131,6 @@ def process_patient_set(
     relative_path_to_frames_folder,
     relative_path_to_focus_output_folder,
     path_to_manifest_output_directory, 
-    patient_type_label=None,
     timestamp=None):
 
     """Processes a set of patients from a top level directory.
@@ -186,9 +185,9 @@ def process_patient_set(
 
         for patient in patient_subdirectories:
 
-            print("Processing patient: {0}".format(patient))
+            print("Processing patient: {}".format(patient))
 
-            patient_directory_absolute_path = "{0}/{}".format(
+            patient_directory_absolute_path = "{}/{}".format(
                 path.rstrip("/"),
                 patient)
 
@@ -206,13 +205,6 @@ def process_patient_set(
 
             # Dump the patient records to file
             json.dump(patient_records, manifest_file)
-
-    # Write all patient records to manifest file. 
-
-    # patient_records["TIMESTAMP"] = timestamp
-    # patient_records["FRAME_FOLDER"] = relative_path_to_frames_folder
-    # patient_records["FOCUS_FOLDER"] = relative_path_to_focus_output_folder
-    # json.dump(patient_records, manifest_file, indent=4)
 
     # Cleanup
 
@@ -262,5 +254,5 @@ if __name__ == "__main__":
         args.relative_path_to_frames_directory,
         args.relative_path_to_focus_output_folder,
         args.path_to_manifest_output_directory, 
-        args.timestamp)
+        timestamp=args.timestamp)
 
