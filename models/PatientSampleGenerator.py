@@ -4,7 +4,8 @@ from constants.ultrasoundConstants import (
     TUMOR_BENIGN,
     TUMOR_MALIGNANT,
     TUMOR_TYPE_LABEL,
-    FOCUS_HASH_LABEL)
+    FOCUS_HASH_LABEL,
+    SCALE_LABEL)
 from constants.modelConstants import (
     DEFAULT_BATCH_SIZE,
     SAMPLE_WIDTH,
@@ -30,6 +31,9 @@ class PatientSampleGenerator:
         image_type: (optional) type of image frames to process (IMAGE_TYPE Enum). i.e. grayscale or color
         target_shape: (optional) array containing target shape to use for output samples
         timestamp: (optional) optional timestamp string to append in focus directory path. i.e. "*/focus_timestamp/*
+        kill_on_last_patient: (optional) Cycle through all matching patients exactly once. Forces generator to act like single-shot iterator
+        use_categorical: (optional) Output class labels as one-hot categorical matrix instead of numerical label 
+        auto_resize_to_manifest_scale_max: (optional) use the maximum scale value in the manifest as a reference 
 
     Returns:
         Tuple containing numpy arrays ((batch_size, (target_shape)), [labels]) 
@@ -50,7 +54,8 @@ class PatientSampleGenerator:
         target_shape=None,
         timestamp=None,
         kill_on_last_patient=False,
-        use_categorical=False):
+        use_categorical=False,
+        auto_resize_to_manifest_scale_max=False):
         
         self.raw_patient_list = patient_list
         self.manifest = manifest
@@ -63,6 +68,7 @@ class PatientSampleGenerator:
         self.target_shape = target_shape
         self.kill_on_last_patient = kill_on_last_patient
         self.use_categorical = use_categorical
+        self.auto_resize_to_manifest_scale_max = auto_resize_to_manifest_scale_max
 
         # Find all the patientIds with at least one frame in the specified IMAGE_TYPE
         # Patient list is unfiltered if IMAGE_TYPE.ALL
@@ -76,7 +82,21 @@ class PatientSampleGenerator:
         if len(cleared_patients) == 0:
             raise PatientSampleGeneratorException(
                 "No patients found with focus in image type: {0}".format(self.image_type.value))
-        
+
+
+        if auto_resize_to_manifest_scale_max:
+            manifest_scale_max = 0.0
+            for patient in cleared_patients:            
+                try:
+                    candidate_max = max([frame[SCALE_LABEL] for frame in manifest[patient]])
+                    if candidate_max > manifest_scale_max: 
+                        manifest_scale_max = candidate_max
+                except:
+                    pass
+
+            print("Maximum scale for patient partition: {}".format(manifest_scale_max))
+            self.manifest_scale_max = manifest_scale_max
+
         self.cleared_patients = cleared_patients
         self.patient_index = self.frame_index = 0
 
@@ -143,6 +163,24 @@ class PatientSampleGenerator:
                 # Stored image is corrupted. Skip to next frame. 
                 skip_flag = True
             else:
+
+                if self.auto_resize_to_manifest_scale_max:
+                    try:
+                        frame_scale = self.patient_frames[self.frame_index][SCALE_LABEL]
+                        upscale_ratio = self.manifest_scale_max / frame_scale
+
+                        loaded_image = cv2.resize(
+                            loaded_image, 
+                            None, 
+                            fx=upscale_ratio, 
+                            fy=upscale_ratio, 
+                            interpolation=cv2.INTER_CUBIC)
+
+                    except:
+                        print("Unable to auto-resize. Frame {} does not have scale label".format(
+                            self.patient_frames[self.frame_index][FOCUS_HASH_LABEL]
+                        ))
+
                 raw_image_batch = image_random_sampling_batch(
                     loaded_image, 
                     target_shape=self.target_shape,
@@ -219,7 +257,7 @@ if __name__ == "__main__":
 
     dirname = os.path.dirname(__file__)
 
-    with open(os.path.abspath("processedData//manifest_COMPLETE_2018-07-11_18-51-03.json"), "r") as fp:
+    with open(os.path.abspath("../ProcessedDatasets/2018-07-11_18-51-03/manifest_COMPLETE_2018-07-11_18-51-03.json"), "r") as fp:
         manifest = json.load(fp)
 
     image_data_generator = ImageDataGenerator(
@@ -239,7 +277,8 @@ if __name__ == "__main__":
         image_type=IMAGE_TYPE.ALL,
         image_data_generator=image_data_generator,
         timestamp="2018-07-11_18-51-03",
-        batch_size=BATCH_SIZE
+        batch_size=BATCH_SIZE,
+        auto_resize_to_manifest_scale_max=True
     ))
     
     for p in range(10):
