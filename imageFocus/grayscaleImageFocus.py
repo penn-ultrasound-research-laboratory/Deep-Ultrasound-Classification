@@ -33,17 +33,38 @@ def get_grayscale_image_focus(path_to_image, path_to_output_directory, HSV_lower
         # Load the image and convert it to HSV from BGR
         # Then, threshold the HSV image to get only target border color
         bgr_image = cv2.imread(path_to_image, cv2.IMREAD_COLOR)
+        histogram_image = np.copy(bgr_image)
         bgr_image = bgr_image[70:, 90:]
+        histogram_image[70:, 90:] = 0
+
+        # cv2.imshow('histogram_image', histogram_image)
+        # cv2.waitKey(0)
         
-        hist, bins = np.histogram(bgr_image[:70, :90].ravel(), bins=256)
+        hist, bins = np.histogram(histogram_image.ravel(), bins=256)
+        
+        artefact_focal_points = []
+        # Always append the global maximum in the artefact list
+        artefact_focal_points.append(100 + np.argmax(hist[100:]))
+
+        # Optionally include another focal point if bright values show up as artefacts
+        if hist[230 + np.argmax(hist[230:])] > 30:
+            artefact_focal_points.append(230 + np.argmax(hist[230:]))
+
+        print("Artefacts: {}".format(artefact_focal_points))
+
+        # Two situations: The global max greater than 100 is the only color iff 
+        # there is no value about 235 where the histgram count is above 30.
+
+        # max_1_100 = 0 + np.argmax(hist[1:101])
+        # max_101_200 = 101 + np.argmax(hist[101:201])
+        # max_201_255 = 201 + np.argmax(hist[201:256]) 
+        # print("global: {} | 200+: {}".format(global_max, max_200_plus))
+        # print("Count: {} | Count: {}".format(hist[global_max], hist[max_200_plus]))
+
         # plt.plot(hist)
-        # plt.xlim([0, 256])
         # plt.show()
 
-        max_0_100 = 0 + np.argmax(hist[0:101])
-        max_101_200 = 101 + np.argmax(hist[101:201])
-        max_201_255 = 201 + np.argmax(hist[201:256]) 
-        print("0-100: {} | 101-200: {} | 201-255: {}".format(max_0_100, max_101_200, max_201_255))
+        # return
 
         mask = cv2.inRange(
             bgr_image, 
@@ -59,6 +80,7 @@ def get_grayscale_image_focus(path_to_image, path_to_output_directory, HSV_lower
 
         # Contour with maximum enclosed area corresponds to highlight rectangle
         
+
         max_contour = max(contours, key = cv2.contourArea)
         x, y, w, h = cv2.boundingRect(max_contour)
 
@@ -93,32 +115,42 @@ def get_grayscale_image_focus(path_to_image, path_to_output_directory, HSV_lower
 
         cropped_image = focus_image[y+3:y+h-3, x+3:x+w-3]
 
-        mask_0_100 = cv2.inRange(
+        mask_global = cv2.inRange(
             cropped_image,
-            np.array([max_0_100]* 3, np.uint8),
-            np.array([max_0_100]* 3, np.uint8)
-        )
-        mask_101_200 = cv2.inRange(
-            cropped_image,
-            np.array([max_101_200] * 3, np.uint8),
-            np.array([max_101_200] * 3, np.uint8)
-        )
-        mask_201_255 = cv2.inRange(
-            cropped_image,
-            np.array([max_201_255] * 3, np.uint8),
-            np.array([max_201_255] * 3, np.uint8)
+            np.array([artefact_focal_points[0]-20]* 3, np.uint8),
+            np.array([artefact_focal_points[0]+20]* 3, np.uint8)
         )
 
-        composite_mask = cv2.bitwise_or(mask_0_100, cv2.bitwise_or(
-            mask_101_200, mask_201_255
-        ))
-        kernel = np.ones((3,3),np.uint8)
-        erosion = cv2.erode(composite_mask, kernel, iterations = 1)
+        if len(artefact_focal_points) > 1:
 
-        cv2.imshow('composite', erosion)
+            mask_white = cv2.inRange(
+                cropped_image,
+                np.array([artefact_focal_points[1]-20] * 3, np.uint8),
+                np.array([artefact_focal_points[1]+20] * 3, np.uint8)
+            )
+
+        # Mask to get rid of black is just adding noise. Consider removing and just going with high values 120, 240, etc
+        
+        if len(artefact_focal_points) == 1:
+            composite_mask = mask_global
+        else:
+            composite_mask = cv2.bitwise_or(mask_global, mask_white)
+
+        # Not terrible. Kernel size will need to be adjusted ad-hoc
+        kernel = np.ones((2,2), np.uint8)
+        dilation = cv2.morphologyEx(composite_mask, cv2.MORPH_CLOSE, kernel)
+
+        edges = cv2.Canny(cropped_image,100,200, 3)
+
+        plt.plot(hist)
+        plt.show()
+
+        cv2.imshow('composite', dilation)
         cv2.imshow('cropped', cropped_image)
+        cv2.imshow('composite_mask', composite_mask)
+        cv2.imshow('canny detection', edges)
         cv2.waitKey(0)
-        return
+        
 
 
         output_path = '{0}/{1}.png'.format(path_to_output_directory, uuid.uuid4())
@@ -130,36 +162,6 @@ def get_grayscale_image_focus(path_to_image, path_to_output_directory, HSV_lower
     except Exception as exception:
         raise IOError('Error isolating and saving image focus')
 
-def get_region_of_interest(path_to_image):
-
-    # Read the image you want connected components of
-    src = cv2.imread(path_to_image, cv2.IMREAD_GRAYSCALE)
-    # Threshold it so it becomes binary
-    ret, thresh = cv2.threshold(src,0,255,cv2.THRESH_BINARY)
-    # You need to choose 4 or 8 for connectivity type
-    connectivity = 4  
-    # Perform the operation
-    output = cv2.connectedComponentsWithStats(thresh, connectivity, cv2.CV_32S)
-    # Get the results
-    # The first cell is the number of labels
-    num_labels = output[0]
-    # The second cell is the label matrix
-    labels = output[1]
-    # The third cell is the stat matrix
-    stats = output[2]
-    # The fourth cell is the centroid matrix
-    centroids = output[3]
-
-    # Map component labels to hue val
-    label_hue = np.uint8(179*labels/np.max(labels))
-    blank_ch = 255*np.ones_like(label_hue)
-    labeled_img = cv2.merge([label_hue, blank_ch, blank_ch])
-
-    # cvt to BGR for display
-    labeled_img = cv2.cvtColor(labeled_img, cv2.COLOR_HSV2BGR)
-    labeled_img[label_hue==0] = 0
-    cv2.imshow('labeled.png', labeled_img)
-    cv2.waitKey()
 
 if __name__ == '__main__':
 
