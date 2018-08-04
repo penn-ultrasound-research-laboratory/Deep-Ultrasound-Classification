@@ -3,7 +3,6 @@ import cv2
 import numpy as np
 from constants.ultrasoundConstants import HSV_COLOR_THRESHOLD
 
-
 def get_color_image_focus(path_to_image, path_to_output_directory, HSV_lower_bound, HSV_upper_bound):
     '''
     Determines the "focus" of an ultrasound frame in Color/CPA. 
@@ -92,10 +91,10 @@ if __name__ == '__main__':
     ap.add_argument("-p", "--preprocess", type=str, default="thresh",
         help="type of preprocessing to be done")
         
-    args = vars(ap.parse_args())
+    args = ap.parse_args()
 
     get_color_image_focus(
-        args['image'],
+        args.image,
         '.', 
         np.array(HSV_COLOR_THRESHOLD.LOWER.value, np.uint8), 
         np.array(HSV_COLOR_THRESHOLD.UPPER.value, np.uint8))

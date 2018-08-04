@@ -178,6 +178,10 @@ def process_patient_set(
         (path_to_benign_top_level_directory, TUMOR_BENIGN),
         (path_to_malignant_top_level_directory, TUMOR_MALIGNANT)]
 
+    patient_records = {
+        "TIMESTAMP": timestamp
+    }
+
     for path, patient_type_label in all_patients:
 
         patient_subdirectories = [name for name in os.listdir(path) 
@@ -200,11 +204,10 @@ def process_patient_set(
                 timestamp,
                 patient_type_label)
 
-            patient_records = {}
             patient_records[patient] = acquired_records
 
-            # Dump the patient records to file
-            json.dump(patient_records, manifest_file)
+    # Dump the patient records to file
+    json.dump(patient_records, manifest_file)
 
     # Cleanup
 

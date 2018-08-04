@@ -128,7 +128,6 @@ def image_random_sampling_batch(
     except TypeError as e:
         raise TypeError(e)
 
-
 if __name__ == "__main__":
 
     batch_size=10
