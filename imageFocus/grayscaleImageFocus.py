@@ -112,8 +112,10 @@ def get_grayscale_image_focus(path_to_image, path_to_output_directory, HSV_lower
         composite_mask = cv2.bitwise_or(mask_0_100, cv2.bitwise_or(
             mask_101_200, mask_201_255
         ))
+        kernel = np.ones((3,3),np.uint8)
+        erosion = cv2.erode(composite_mask, kernel, iterations = 1)
 
-        cv2.imshow('composite', composite_mask)
+        cv2.imshow('composite', erosion)
         cv2.imshow('cropped', cropped_image)
         cv2.waitKey(0)
         return
