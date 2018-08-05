@@ -26,14 +26,16 @@ class PatientSampleGenerator:
         benign_top_level_path: absolute path to benign directory
         malignant_top_level_path: absolute path to malignant directory
         manifest: dictionary parsed from JSON containing all information from image OCR, tumor types, etc
-        batch_size: (optional) number of images to output in a batch
-        image_data_generator: (optional) preprocessing generator to run on input images
-        image_type: (optional) type of image frames to process (IMAGE_TYPE Enum). i.e. grayscale or color
-        target_shape: (optional) array containing target shape to use for output samples
-        timestamp: (optional) optional timestamp string to append in focus directory path. i.e. "*/focus_timestamp/*
-        kill_on_last_patient: (optional) Cycle through all matching patients exactly once. Forces generator to act like single-shot iterator
-        use_categorical: (optional) Output class labels as one-hot categorical matrix instead of numerical label 
-        auto_resize_to_manifest_scale_max: (optional) use the maximum scale value in the manifest as a reference 
+
+    Optional:
+        batch_size: number of images to output in a batch
+        image_data_generator: preprocessing generator to run on input images
+        image_type: type of image frames to process (IMAGE_TYPE Enum). i.e. grayscale or color
+        target_shape: array containing target shape to use for output samples
+        timestamp: optional timestamp string to append in focus directory path. i.e. "*/focus_timestamp/*
+        kill_on_last_patient: Cycle through all matching patients exactly once. Forces generator to act like single-shot iterator
+        use_categorical: Output class labels as one-hot categorical matrix instead of numerical label 
+        auto_resize_to_manifest_scale_max: use the maximum scale value in the manifest as a reference 
 
     Returns:
         Tuple containing numpy arrays ((batch_size, (target_shape)), [labels]) 
@@ -143,10 +145,7 @@ class PatientSampleGenerator:
                 cv2.IMREAD_COLOR if current_frame_color == IMAGE_TYPE.COLOR.value
                 else cv2.IMREAD_GRAYSCALE)
 
-            loaded_image = cv2.imread("{}/{}/{}/{}".format(
-                top_level_path,
-                self.patient_id,
-                focus_directory,
+            loaded_image = cv2.imread("{}".format(
                 self.patient_frames[self.frame_index][FOCUS_HASH_LABEL]),
                 color_mode)
 
@@ -209,18 +208,18 @@ class PatientSampleGenerator:
                 # Always augment by providing several common gradient transforms on the input
                 # Randomly sample an images from the batch and generate gradients from the batch 
 
-                print(self)
-                cv2.imshow('img', raw_image_batch[np.random.randint(self.batch_size)])
-                cv2.waitKey(0)
+                # print(self)
+                # cv2.imshow('img', raw_image_batch[np.random.randint(self.batch_size)])
+                # cv2.waitKey(0)
 
-                gradient_batch = np.stack([
-                    cv2.Laplacian(raw_image_batch[np.random.randint(self.batch_size)], cv2.CV_64F),
-                    cv2.Sobel(raw_image_batch[np.random.randint(self.batch_size)], cv2.CV_64F, 1, 0, ksize=3),
-                    cv2.Sobel(raw_image_batch[np.random.randint(self.batch_size)], cv2.CV_64F, 0, 1, ksize=3)
-                ], 
-                axis=0)
+                # gradient_batch = np.stack([
+                #     cv2.Laplacian(raw_image_batch[np.random.randint(self.batch_size)], cv2.CV_64F),
+                #     cv2.Sobel(raw_image_batch[np.random.randint(self.batch_size)], cv2.CV_64F, 1, 0, ksize=3),
+                #     cv2.Sobel(raw_image_batch[np.random.randint(self.batch_size)], cv2.CV_64F, 0, 1, ksize=3)
+                # ], 
+                # axis=0)
 
-                raw_image_batch = np.concatenate((raw_image_batch, gradient_batch), axis=0)
+                # raw_image_batch = np.concatenate((raw_image_batch, gradient_batch), axis=0)
 
             if not is_last_frame:
 
