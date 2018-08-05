@@ -4,7 +4,8 @@ from constants.ultrasoundConstants import (
     TUMOR_BENIGN,
     TUMOR_MALIGNANT,
     TUMOR_TYPE_LABEL,
-    FOCUS_HASH_LABEL)
+    FOCUS_HASH_LABEL,
+    SCALE_LABEL)
 from constants.modelConstants import (
     DEFAULT_BATCH_SIZE,
     SAMPLE_WIDTH,
@@ -25,11 +26,16 @@ class PatientSampleGenerator:
         benign_top_level_path: absolute path to benign directory
         malignant_top_level_path: absolute path to malignant directory
         manifest: dictionary parsed from JSON containing all information from image OCR, tumor types, etc
-        batch_size: (optional) number of images to output in a batch
-        image_data_generator: (optional) preprocessing generator to run on input images
-        image_type: (optional) type of image frames to process (IMAGE_TYPE Enum). i.e. grayscale or color
-        target_shape: (optional) array containing target shape to use for output samples
-        timestamp: (optional) optional timestamp string to append in focus directory path. i.e. "*/focus_timestamp/*
+
+    Optional:
+        batch_size: number of images to output in a batch
+        image_data_generator: preprocessing generator to run on input images
+        image_type: type of image frames to process (IMAGE_TYPE Enum). i.e. grayscale or color
+        target_shape: array containing target shape to use for output samples
+        timestamp: optional timestamp string to append in focus directory path. i.e. "*/focus_timestamp/*
+        kill_on_last_patient: Cycle through all matching patients exactly once. Forces generator to act like single-shot iterator
+        use_categorical: Output class labels as one-hot categorical matrix instead of numerical label 
+        auto_resize_to_manifest_scale_max: use the maximum scale value in the manifest as a reference 
 
     Returns:
         Tuple containing numpy arrays ((batch_size, (target_shape)), [labels]) 
@@ -50,7 +56,8 @@ class PatientSampleGenerator:
         target_shape=None,
         timestamp=None,
         kill_on_last_patient=False,
-        use_categorical=False):
+        use_categorical=False,
+        auto_resize_to_manifest_scale_max=False):
         
         self.raw_patient_list = patient_list
         self.manifest = manifest
@@ -63,6 +70,7 @@ class PatientSampleGenerator:
         self.target_shape = target_shape
         self.kill_on_last_patient = kill_on_last_patient
         self.use_categorical = use_categorical
+        self.auto_resize_to_manifest_scale_max = auto_resize_to_manifest_scale_max
 
         # Find all the patientIds with at least one frame in the specified IMAGE_TYPE
         # Patient list is unfiltered if IMAGE_TYPE.ALL
@@ -76,7 +84,21 @@ class PatientSampleGenerator:
         if len(cleared_patients) == 0:
             raise PatientSampleGeneratorException(
                 "No patients found with focus in image type: {0}".format(self.image_type.value))
-        
+
+
+        if auto_resize_to_manifest_scale_max:
+            manifest_scale_max = 0.0
+            for patient in cleared_patients:            
+                try:
+                    candidate_max = max([frame[SCALE_LABEL] for frame in manifest[patient]])
+                    if candidate_max > manifest_scale_max: 
+                        manifest_scale_max = candidate_max
+                except:
+                    pass
+
+            print("Maximum scale for patient partition: {}".format(manifest_scale_max))
+            self.manifest_scale_max = manifest_scale_max
+
         self.cleared_patients = cleared_patients
         self.patient_index = self.frame_index = 0
 
@@ -123,10 +145,7 @@ class PatientSampleGenerator:
                 cv2.IMREAD_COLOR if current_frame_color == IMAGE_TYPE.COLOR.value
                 else cv2.IMREAD_GRAYSCALE)
 
-            loaded_image = cv2.imread("{}/{}/{}/{}".format(
-                top_level_path,
-                self.patient_id,
-                focus_directory,
+            loaded_image = cv2.imread("{}".format(
                 self.patient_frames[self.frame_index][FOCUS_HASH_LABEL]),
                 color_mode)
 
@@ -143,6 +162,24 @@ class PatientSampleGenerator:
                 # Stored image is corrupted. Skip to next frame. 
                 skip_flag = True
             else:
+
+                if self.auto_resize_to_manifest_scale_max:
+                    try:
+                        frame_scale = self.patient_frames[self.frame_index][SCALE_LABEL]
+                        upscale_ratio = self.manifest_scale_max / frame_scale
+
+                        loaded_image = cv2.resize(
+                            loaded_image, 
+                            None, 
+                            fx=upscale_ratio, 
+                            fy=upscale_ratio, 
+                            interpolation=cv2.INTER_CUBIC)
+
+                    except:
+                        print("Unable to auto-resize. Frame {} does not have scale label".format(
+                            self.patient_frames[self.frame_index][FOCUS_HASH_LABEL]
+                        ))
+
                 raw_image_batch = image_random_sampling_batch(
                     loaded_image, 
                     target_shape=self.target_shape,
@@ -167,6 +204,22 @@ class PatientSampleGenerator:
                         shuffle=True)
 
                     raw_image_batch = next(gen)
+
+                # Always augment by providing several common gradient transforms on the input
+                # Randomly sample an images from the batch and generate gradients from the batch 
+
+                # print(self)
+                # cv2.imshow('img', raw_image_batch[np.random.randint(self.batch_size)])
+                # cv2.waitKey(0)
+
+                # gradient_batch = np.stack([
+                #     cv2.Laplacian(raw_image_batch[np.random.randint(self.batch_size)], cv2.CV_64F),
+                #     cv2.Sobel(raw_image_batch[np.random.randint(self.batch_size)], cv2.CV_64F, 1, 0, ksize=3),
+                #     cv2.Sobel(raw_image_batch[np.random.randint(self.batch_size)], cv2.CV_64F, 0, 1, ksize=3)
+                # ], 
+                # axis=0)
+
+                # raw_image_batch = np.concatenate((raw_image_batch, gradient_batch), axis=0)
 
             if not is_last_frame:
 
@@ -203,7 +256,7 @@ if __name__ == "__main__":
 
     dirname = os.path.dirname(__file__)
 
-    with open(os.path.abspath("processedData//manifest_COMPLETE_2018-07-11_18-51-03.json"), "r") as fp:
+    with open(os.path.abspath("../ProcessedDatasets/2018-07-11_18-51-03/manifest_COMPLETE_2018-07-11_18-51-03.json"), "r") as fp:
         manifest = json.load(fp)
 
     image_data_generator = ImageDataGenerator(
@@ -223,12 +276,13 @@ if __name__ == "__main__":
         image_type=IMAGE_TYPE.ALL,
         image_data_generator=image_data_generator,
         timestamp="2018-07-11_18-51-03",
-        batch_size=BATCH_SIZE
+        batch_size=BATCH_SIZE,
+        auto_resize_to_manifest_scale_max=True
     ))
     
     for p in range(10):
         raw_image_batch, labels = next(patient_sample_generator)
 
-        for i in range(BATCH_SIZE):
+        for i in range(len(raw_image_batch)):
             cv2.imshow(str(labels[i]), raw_image_batch[i])
             cv2.waitKey(0)    

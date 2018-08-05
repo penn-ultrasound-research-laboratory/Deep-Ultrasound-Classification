@@ -104,7 +104,8 @@ def extract_save_patient_features(
             image_type = image_type,
             image_data_generator = image_data_generator,
             timestamp = timestamp,
-            kill_on_last_patient = True)
+            kill_on_last_patient = True,
+            auto_resize_to_manifest_scale_max=True)
 
         test_sample_generator = PatientSampleGenerator(
             test_partition,
@@ -116,7 +117,8 @@ def extract_save_patient_features(
             image_type = image_type,
             image_data_generator = image_data_generator,
             timestamp = timestamp,
-            kill_on_last_patient = True)
+            kill_on_last_patient = True,
+            auto_resize_to_manifest_scale_max = True)
 
         X_training = y_training = None
         try:
