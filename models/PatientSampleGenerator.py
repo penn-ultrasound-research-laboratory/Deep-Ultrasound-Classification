@@ -1,3 +1,5 @@
+import numpy as np
+
 from constants.ultrasoundConstants import (
     IMAGE_TYPE,
     IMAGE_TYPE_LABEL,
@@ -15,8 +17,13 @@ from constants.exceptions.customExceptions import PatientSampleGeneratorExceptio
 from utilities.imageUtilities import image_random_sampling_batch
 from keras.preprocessing.image import ImageDataGenerator
 from keras.utils import to_categorical
-import numpy as np
-import cv2, os, json
+
+import cv2
+import json
+import logging
+import os
+
+logger = logging.getLogger('research')
 
 class PatientSampleGenerator:
     """Generator that returns batches of samples for training and evaluation
@@ -96,7 +103,7 @@ class PatientSampleGenerator:
                 except:
                     pass
 
-            print("Maximum scale for patient partition: {}".format(manifest_scale_max))
+            logging.info("Maximum scale for patient partition: {}".format(manifest_scale_max))
             self.manifest_scale_max = manifest_scale_max
 
         self.cleared_patients = cleared_patients
@@ -131,8 +138,6 @@ class PatientSampleGenerator:
             is_last_frame = self.frame_index == len(self.patient_frames) - 1
             is_last_patient = self.patient_index == len(self.cleared_patients) - 1
 
-
-
             top_level_path = (
                 self.benign_top_level_path if self.patient_type == TUMOR_BENIGN 
                 else self.malignant_top_level_path)
@@ -158,7 +163,7 @@ class PatientSampleGenerator:
 
 
             if loaded_image is None or len(loaded_image.shape) < 2:
-                print("Skipping due to corruption: {} | frame: {}".format(self.patient_id, self.patient_frames[self.frame_index][FOCUS_HASH_LABEL]))
+                logging.info("Skipping due to corruption: {} | frame: {}".format(self.patient_id, self.patient_frames[self.frame_index][FOCUS_HASH_LABEL]))
                 # Stored image is corrupted. Skip to next frame. 
                 skip_flag = True
             else:
@@ -168,6 +173,8 @@ class PatientSampleGenerator:
                         frame_scale = self.patient_frames[self.frame_index][SCALE_LABEL]
                         upscale_ratio = self.manifest_scale_max / frame_scale
 
+                        logging.debug("Upscale Ratio: {}".format(upscale_ratio))
+
                         loaded_image = cv2.resize(
                             loaded_image, 
                             None, 
@@ -176,15 +183,18 @@ class PatientSampleGenerator:
                             interpolation=cv2.INTER_CUBIC)
 
                     except:
-                        print("Unable to auto-resize. Frame {} does not have scale label".format(
+                        logger.error("Unable to auto-resize. Frame {} does not have scale label".format(
                             self.patient_frames[self.frame_index][FOCUS_HASH_LABEL]
                         ))
 
                 raw_image_batch = image_random_sampling_batch(
                     loaded_image, 
                     target_shape=self.target_shape,
-                    upscale_to_target=True,
-                    batch_size=self.batch_size)
+                    upscale_to_target=False,
+                    batch_size=self.batch_size,
+                    always_sample_center=True)
+
+                logger.info("Raw Image Batch shape: {}".format(raw_image_batch.shape))
 
                 # Convert the tumor string label to integer label
                 frame_label = tumor_integer_label(self.patient_frames[self.frame_index][TUMOR_TYPE_LABEL])
@@ -204,6 +214,8 @@ class PatientSampleGenerator:
                         shuffle=True)
 
                     raw_image_batch = next(gen)
+
+                    logging.debug("Used image data generator to transform input image to shape: {}".format(raw_image_batch.shape))
 
                 # Always augment by providing several common gradient transforms on the input
                 # Randomly sample an images from the batch and generate gradients from the batch 
@@ -240,7 +252,8 @@ class PatientSampleGenerator:
            
             # Class outputs must be categorical. 
             if not skip_flag:
-                print("Training on patient: {} | color: {} | frame: {}".format(self.patient_id, current_frame_color, self.patient_frames[self.frame_index][FOCUS_HASH_LABEL]))
+                logging.info("Training on patient: {} | color: {} | frame: {}".format(self.patient_id, current_frame_color, self.patient_frames[self.frame_index][FOCUS_HASH_LABEL]))
+
                 if self.use_categorical:
                     yield (raw_image_batch, to_categorical(np.repeat(frame_label, self.batch_size), num_classes=2))
                 else:

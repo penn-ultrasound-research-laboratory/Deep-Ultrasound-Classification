@@ -1,5 +1,6 @@
 import argparse
 import cv2
+import logging
 import uuid
 import numpy as np
 from constants.ultrasoundConstants import IMAGE_TYPE
@@ -56,7 +57,8 @@ def image_random_sampling_batch(
     batch_size = 16,
     use_min_dimension = False,
     upscale_to_target = False,
-    upscale_method = cv2.INTER_CUBIC):
+    upscale_method = cv2.INTER_CUBIC,
+    always_sample_center=False):
     """Randomly sample an image to produce sample batch 
 
     Arguments:
@@ -69,6 +71,10 @@ def image_random_sampling_batch(
         upscale_to_target: (optional) Upscale the image so that image dimensions >= target_shape before sampling
             target_shape must be defined to use upscale_to_target
         upscale_method: (optional) Interpolation method to used. Default cv2.INTER_CUBIC
+
+    Optional:
+
+
     Returns:
         4D array containing sampled images in axis=0. 
 
@@ -107,14 +113,22 @@ def image_random_sampling_batch(
         row_origin_max = image.shape[0] - target_shape[0]
         column_origin_max = image.shape[1] - target_shape[1]
 
-        # Sample random origins from origin range
-        row_origins = (
-            np.random.randint(0, row_origin_max, batch_size) if row_origin_max > 0
-            else [0] * batch_size)
+        # If always_sample_center - always pull the same center cropped image to form the batch. 
+        # Option likely used in conjunction with image data generator that will randomly transform 
+        # samples of the image bath. Otherwise, randomly sample origins from origin range
+        
+        if always_sample_center:
+            row_origins = [row_origin_max // 2] * batch_size
+            column_origins = [column_origin_max // 2] * batch_size
 
-        column_origins = (
-            np.random.randint(0, column_origin_max, batch_size) if column_origin_max > 0
-            else [0] * batch_size)
+        else:
+            row_origins = (
+                np.random.randint(0, row_origin_max, batch_size) if row_origin_max > 0
+                else [0] * batch_size)
+
+            column_origins = (
+                np.random.randint(0, column_origin_max, batch_size) if column_origin_max > 0
+                else [0] * batch_size)
 
         return np.stack(map(lambda sample_index: center_crop(
             image,
@@ -131,14 +145,15 @@ def image_random_sampling_batch(
 
 if __name__ == "__main__":
 
-    batch_size=10
-    elephant = cv2.imread("models/elephant.jpg", cv2.IMREAD_COLOR)
+    batch_size=5
+    elephant = cv2.imread("../TestImages/poorlyFocused.png", cv2.IMREAD_COLOR)
 
     random_batch = image_random_sampling_batch(
         elephant, 
         target_shape=[220, 220],
         upscale_to_target=True,
-        batch_size=batch_size)
+        batch_size=batch_size,
+        always_sample_center=True)
     
     for i in range(batch_size):
         cv2.imshow("mini", random_batch[i])

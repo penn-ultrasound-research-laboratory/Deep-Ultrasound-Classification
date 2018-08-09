@@ -1,23 +1,38 @@
-import argparse, json, uuid
+import argparse
+import json
+import logging
+import uuid
+
 import numpy as np
 import tensorflow as tf
-from constants.exceptions.customExceptions import ExtractSavePatientFeatureException
-from models.resNet50 import ResNet50
+
 from utilities.patientsPartition import patient_train_test_validation_split
 from models.PatientSampleGenerator import PatientSampleGenerator
-from keras.preprocessing.image import ImageDataGenerator
+
+from models.resNet50 import ResNet50
+
+from constants.exceptions.customExceptions import ExtractSavePatientFeatureException
+
 from constants.ultrasoundConstants import (
     IMAGE_TYPE,
     NUMBER_CHANNELS_COLOR,
     NUMBER_CHANNELS_GRAYSCALE)
+
 from constants.modelConstants import (
     DEFAULT_BATCH_SIZE,
     RESNET50_REQUIRED_NUMBER_CHANNELS,
     SAMPLE_WIDTH,
-    SAMPLE_HEIGHT)
+    SAMPLE_HEIGHT,
+    INCEPTION_RESNET_V2_WIDTH,
+    INCEPTION_RESNET_V2_HEIGHT)
+    
 from keras.losses import categorical_crossentropy
 from keras.optimizers import Adam
 from keras.models import Model
+from keras.applications import inception_resnet_v2
+from keras.preprocessing.image import ImageDataGenerator
+
+logger = logging.getLogger('research')
 
 def extract_save_patient_features(
     benign_top_level_path, 
@@ -27,7 +42,7 @@ def extract_save_patient_features(
     batch_size=DEFAULT_BATCH_SIZE,
     image_data_generator=None,
     image_type=IMAGE_TYPE.ALL,
-    target_shape=[SAMPLE_HEIGHT, SAMPLE_WIDTH],
+    target_shape=[INCEPTION_RESNET_V2_HEIGHT, INCEPTION_RESNET_V2_WIDTH],
     timestamp=None):
     """Builds and saves a Numpy dataset with Resnet extracted features
 
@@ -55,15 +70,20 @@ def extract_save_patient_features(
     try:
         
         # When include_top=True input shape must be 224,224
-        base_model = ResNet50(
+        # base_model = ResNet50(
+        #     include_top=True,
+        #     input_shape=tuple(target_shape) + (RESNET50_REQUIRED_NUMBER_CHANNELS,),
+        #     weights='imagenet')
+
+        base_model = inception_resnet_v2.InceptionResNetV2(
             include_top=True,
-            input_shape=tuple(target_shape) + (RESNET50_REQUIRED_NUMBER_CHANNELS,),
-            weights='imagenet')
+            classes=2,
+            weights=None)
 
         # Pre-softmax layer may be way too late
         model = Model(
             input=base_model.input,
-            output=base_model.get_layer('fc1000').output)
+            output=base_model.get_layer('conv_7b_bn').output)
         
         # Load the patient manifest
         with open(manifest_path, 'r') as f:
@@ -89,8 +109,8 @@ def extract_save_patient_features(
         np.random.shuffle(training_partition)
         np.random.shuffle(test_partition)
 
-        print("Training Partition: {}".format(len(training_partition)))
-        print("Test Partition: {}".format(len(test_partition)))
+        logging.info("Training Partition: {}".format(len(training_partition)))
+        logging.info("Test Partition: {}".format(len(test_partition)))
 
         # PatientSampleGenerator over the training patients
 
@@ -127,6 +147,8 @@ def extract_save_patient_features(
                 current_batch = next(gen)
                 current_predictions = model.predict(current_batch[0])
 
+                logger.info("Current predictions shape: {}".format(current_predictions.shape))
+
                 X_training = current_predictions if X_training is None else np.concatenate((
                     X_training, 
                     current_predictions), 
@@ -138,7 +160,7 @@ def extract_save_patient_features(
                     axis=0)
 
         except Exception as e:
-            print(e)
+            logging.error(e)
 
         X_test = y_test = None
         try:
@@ -146,6 +168,8 @@ def extract_save_patient_features(
             while True:
                 current_batch = next(gen)
                 current_predictions = model.predict(current_batch[0])
+
+                logger.info("Current predictions shape: {}".format(current_predictions.shape))
 
                 X_test = current_predictions if X_test is None else np.concatenate((
                     X_test, 
@@ -158,8 +182,7 @@ def extract_save_patient_features(
                     axis=0)
 
         except Exception as e:
-            print(e)
-
+            logging.error(e)
 
         output_hash = uuid.uuid4()
 
@@ -174,12 +197,12 @@ def extract_save_patient_features(
                 "test_partition": test_partition
             }
             np.save(f, data)
-            print("Saved generated features to output directory. Output hash: {}".format(output_hash))
+            logging.info("Saved generated features to output directory. Output hash: {}".format(output_hash))
 
         return output_hash
 
     except Exception as e:
-        print(e)
+        logging.critical(e)
         return 1
 
 
@@ -220,7 +243,7 @@ if __name__ == '__main__':
     parser.add_argument("-ts",
                         "--target_shape",
                         type = list,
-                        default = [SAMPLE_HEIGHT, SAMPLE_WIDTH],
+                        default = [INCEPTION_RESNET_V2_HEIGHT, INCEPTION_RESNET_V2_WIDTH],
                         help = "Size to use for image samples of taken frames. Used to pad frames that are smaller the target shape, and crop-sample images that are larger than the target shape")
 
     parser.add_argument('-T', '--timestamp',
@@ -231,6 +254,13 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     try:
+    
+        logging.basicConfig(level = logging.INFO, filename = "{}/{}_{}.log".format(
+            args.output_directory_path,
+            args.timestamp,
+            uuid.uuid4()
+        ))
+
         code = extract_save_patient_features(
             args.benign_top_level_path,
             args.malignant_top_level_path,
@@ -241,6 +271,7 @@ if __name__ == '__main__':
             image_type = args.image_type,
             target_shape = args.target_shape,
             timestamp = args.timestamp)
+
 
     except Exception as e:
         raise(e)
