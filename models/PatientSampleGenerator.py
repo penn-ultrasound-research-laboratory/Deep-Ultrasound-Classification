@@ -23,6 +23,7 @@ import cv2
 import json
 import logging
 import os
+import uuid
 
 logger = logging.getLogger('research')
 
@@ -322,5 +323,9 @@ if __name__ == "__main__":
     except Exception as e:
         print(e)
 
-    cv2.imshow("sample", np.vstack(plot_rows))
+    sample_thumbnails = np.vstack(plot_rows)
+
+    cv2.imshow("sample", sample_thumbnails)
     cv2.waitKey(0)
+
+    cv2.imwrite('thumbnails_{}.png'.format(uuid.uuid4()), cv2.cvtColor(sample_thumbnails, COLOR_HSV2BGR, sample_thumbnails))
