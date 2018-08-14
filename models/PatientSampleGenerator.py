@@ -1,4 +1,5 @@
 import numpy as np
+import matplotlib.pyplot as plt
 
 from constants.ultrasoundConstants import (
     IMAGE_TYPE,
@@ -269,7 +270,7 @@ if __name__ == "__main__":
 
     dirname = os.path.dirname(__file__)
 
-    with open(os.path.abspath("../ProcessedDatasets/2018-07-11_18-51-03/manifest_COMPLETE_2018-07-11_18-51-03.json"), "r") as fp:
+    with open(os.path.abspath("../ProcessedDatasets/2018-08-04_16-19-39/manifest_2018-08-04_16-19-39.json"), "r") as fp:
         manifest = json.load(fp)
 
     image_data_generator = ImageDataGenerator(
@@ -281,21 +282,45 @@ if __name__ == "__main__":
     BATCH_SIZE = 5
 
     patient_sample_generator = next(PatientSampleGenerator(
-        [("30BRO3007451", "BENIGN"), ("01PER2043096", "BENIGN")],
+        [("30BRO3007451", "BENIGN"),
+            ("01PER2043096", "BENIGN"),
+            ("79BOY3049163", "MALIGNANT"),
+            ("93KUD3041008", "MALIGNANT")],
         os.path.join(dirname, "../../100_Cases/ComprehensiveMaBenign/Benign"),
-        os.path.join(dirname, "../../100_Cases/ComprehensiveMaBenign/Malignant"),
+        os.path.join(
+            dirname, "../../100_Cases/ComprehensiveMaBenign/Malignant"),
         manifest,
-        target_shape=[200, 200],
+        target_shape=[220, 220],
         image_type=IMAGE_TYPE.ALL,
         image_data_generator=image_data_generator,
-        timestamp="2018-07-11_18-51-03",
+        timestamp="2018-08-04_16-19-39",
         batch_size=BATCH_SIZE,
-        auto_resize_to_manifest_scale_max=True
+        auto_resize_to_manifest_scale_max=True,
+        kill_on_last_patient=True
     ))
-    
-    for p in range(10):
-        raw_image_batch, labels = next(patient_sample_generator)
 
-        for i in range(len(raw_image_batch)):
-            cv2.imshow(str(labels[i]), raw_image_batch[i])
-            cv2.waitKey(0)    
+    MAX_PLOTTING_ROWS = 10
+    
+
+    count = 0
+    plot_rows = []
+    try:
+        while count < MAX_PLOTTING_ROWS:
+            raw_image_batch, labels = next(patient_sample_generator)
+                
+            split = np.split(raw_image_batch, raw_image_batch.shape[0], axis=0)
+            split = [ np.squeeze(img, axis=0) for img in split]
+            print(split[0].shape)
+
+            # cv2.imshow("sample", np.hstack(split))
+            # cv2.waitKey(0)
+
+            plot_rows.append(np.hstack(split))
+
+            count += 1 
+
+    except Exception as e:
+        print(e)
+
+    cv2.imshow("sample", np.vstack(plot_rows))
+    cv2.waitKey(0)
