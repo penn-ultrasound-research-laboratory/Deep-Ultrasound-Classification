@@ -190,7 +190,7 @@ class PatientSampleGenerator:
                 raw_image_batch = image_random_sampling_batch(
                     loaded_image, 
                     target_shape=self.target_shape,
-                    upscale_to_target=False,
+                    upscale_to_target=True,
                     batch_size=self.batch_size,
                     always_sample_center=True)
 
