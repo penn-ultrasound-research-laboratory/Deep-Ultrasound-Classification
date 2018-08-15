@@ -23,6 +23,7 @@ import cv2
 import json
 import logging
 import os
+import uuid
 
 logger = logging.getLogger('research')
 
@@ -203,6 +204,8 @@ class PatientSampleGenerator:
                 # Optional image preprocessing
                 if self.image_data_generator is not None:
 
+                    # Input raw_image_batch is BGR in standard 0-255 range.
+
                     self.image_data_generator.fit(
                         raw_image_batch,
                         augment=True,
@@ -214,25 +217,11 @@ class PatientSampleGenerator:
                         batch_size=self.batch_size, 
                         shuffle=True)
 
+                    # Output of ImageDataGenerator assigned to raw_image_batch is now preprocessed. Values will be negative in range spanning zero if mean normalization is included as part of preprocessing functions. 
+
                     raw_image_batch = next(gen)
 
                     logging.debug("Used image data generator to transform input image to shape: {}".format(raw_image_batch.shape))
-
-                # Always augment by providing several common gradient transforms on the input
-                # Randomly sample an images from the batch and generate gradients from the batch 
-
-                # print(self)
-                # cv2.imshow('img', raw_image_batch[np.random.randint(self.batch_size)])
-                # cv2.waitKey(0)
-
-                # gradient_batch = np.stack([
-                #     cv2.Laplacian(raw_image_batch[np.random.randint(self.batch_size)], cv2.CV_64F),
-                #     cv2.Sobel(raw_image_batch[np.random.randint(self.batch_size)], cv2.CV_64F, 1, 0, ksize=3),
-                #     cv2.Sobel(raw_image_batch[np.random.randint(self.batch_size)], cv2.CV_64F, 0, 1, ksize=3)
-                # ], 
-                # axis=0)
-
-                # raw_image_batch = np.concatenate((raw_image_batch, gradient_batch), axis=0)
 
             if not is_last_frame:
 
@@ -273,13 +262,16 @@ if __name__ == "__main__":
     with open(os.path.abspath("../ProcessedDatasets/2018-08-04_16-19-39/manifest_2018-08-04_16-19-39.json"), "r") as fp:
         manifest = json.load(fp)
 
+    # W/ aim of generating graphics for paper / email. Featurwise normalize according to mean or std. That should be used only in image preprocessing pipeline. Issue is that negative scaled values are meaningless when saving to file or displaying as negative values are truncated to zero. 
+
     image_data_generator = ImageDataGenerator(
-        featurewise_center = True,
-        featurewise_std_normalization = True,
         horizontal_flip = True,
         vertical_flip = True)
 
     BATCH_SIZE = 5
+    MAX_PLOTTING_ROWS = 10
+
+    # Limit to small subset of patients
 
     patient_sample_generator = next(PatientSampleGenerator(
         [("30BRO3007451", "BENIGN"),
@@ -299,9 +291,6 @@ if __name__ == "__main__":
         kill_on_last_patient=True
     ))
 
-    MAX_PLOTTING_ROWS = 10
-    
-
     count = 0
     plot_rows = []
     try:
@@ -310,7 +299,6 @@ if __name__ == "__main__":
                 
             split = np.split(raw_image_batch, raw_image_batch.shape[0], axis=0)
             split = [ np.squeeze(img, axis=0) for img in split]
-            print(split[0].shape)
 
             # cv2.imshow("sample", np.hstack(split))
             # cv2.waitKey(0)
@@ -322,5 +310,9 @@ if __name__ == "__main__":
     except Exception as e:
         print(e)
 
-    cv2.imshow("sample", np.vstack(plot_rows))
-    cv2.waitKey(0)
+    sample_thumbnails = np.vstack(plot_rows)
+
+    # cv2.imshow("sample", sample_thumbnails)
+    # cv2.waitKey(0)
+
+    cv2.imwrite('thumbnails_{}.png'.format(uuid.uuid4()), sample_thumbnails)
