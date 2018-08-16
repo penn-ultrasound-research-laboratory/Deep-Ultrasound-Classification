@@ -11,7 +11,14 @@ def determine_image_type(bgr_image):
     b, g, r = cv2.split(bgr_image)
     equality_check = np.logical_and(np.logical_and(b == r, b == g), r == g)
 
-    if 1.0 - (np.count_nonzero(equality_check) / equality_check.size) < 0.015:
+    # 0.03 is an empirically determined constant. When we convert MOV -> MP4 --> PNG frames, 
+    # there is a small probability that a grayscale frame has some color bleeding. That is, a tiny segment of the 
+    # pixels will take on a grayish/brown tint. Empirically, this gave ~0.02-0.03 color percentage to the full image.
+    # We were basically getting false attribution of GRAYSCALE images to the COLOR image type enum because the
+    # threshold of 0.015 was too low. Increased to 0.04. Hopefully shouldn't create false attribution. 
+    # The color scale bar in true COLOR scans all but guarantees a percentage greater than 10%. 
+
+    if 1.0 - (np.count_nonzero(equality_check) / equality_check.size) < 0.04:
         return IMAGE_TYPE.GRAYSCALE
     else:
         return IMAGE_TYPE.COLOR

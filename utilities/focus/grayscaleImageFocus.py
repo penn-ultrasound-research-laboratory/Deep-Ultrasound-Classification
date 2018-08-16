@@ -1,7 +1,7 @@
 import argparse, uuid
 import cv2
 import numpy as np
-
+from constants.ultrasoundConstants import HSV_COLOR_THRESHOLD
 
 def get_grayscale_image_focus(path_to_image, path_to_output_directory, HSV_lower_bound, HSV_upper_bound):
     '''
@@ -104,5 +104,5 @@ if __name__ == '__main__':
     get_grayscale_image_focus(
         args['image'],
         '.', 
-        np.array(HSV_GRAYSCALE_THRESHOLD.LOWER.value, np.uint8), 
-        HSV_upper_bound)
+        np.array(HSV_COLOR_THRESHOLD.LOWER.value, np.uint8), 
+        np.array(HSV_COLOR_THRESHOLD.UPPER.value, np.uint8))
