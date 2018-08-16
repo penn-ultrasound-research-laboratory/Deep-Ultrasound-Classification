@@ -1,8 +1,8 @@
 from datetime import datetime
 from utilities.imageUtilities import determine_image_type
-from imageFocus.colorImageFocus import get_color_image_focus
-from imageFocus.grayscaleImageFocus import get_grayscale_image_focus
-from textOCR.ocr import isolate_text
+from utilities.focus.colorImageFocus import get_color_image_focus
+from utilities.focus.grayscaleImageFocus import get_grayscale_image_focus
+from utilities.ocrUtilities import isolate_text
 
 from constants.ultrasoundConstants import (
     FOCUS_HASH_LABEL,
