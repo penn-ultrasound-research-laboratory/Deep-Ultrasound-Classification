@@ -131,7 +131,8 @@ def process_patient_set(
     relative_path_to_frames_folder,
     relative_path_to_focus_output_folder,
     path_to_manifest_output_directory, 
-    timestamp=None):
+    timestamp=None,
+    upscale_to_maximum=False):
 
     """Processes a set of patients from a top level directory.
 
@@ -154,6 +155,8 @@ def process_patient_set(
 
     Optional:
         timestamp: String timestamp to use instead of generating using the current time")
+        upscale_to_maximum: second path over all generated focuses to resize them to the maximum value in the manifest. E.g. say the largest scale on a frame is 4.8 cm. Say the scale on a new frame is 3.0 cm. We then upscale the focus by a factor of 4.8 / 3.0. If the scale has no frame, the scale factor will be 4.8 / mean(all_frames)
+
 
     Returns:
         A tuple containing: (Integer: #sucesses, Integer: #failures)
@@ -245,6 +248,12 @@ if __name__ == "__main__":
                         default=None,
                         help="timestamp to use instead of generating one using the current time")
 
+    parser.add_argument("-up",
+                        "--upscale",
+                        type=int,
+                        default=0,
+                        help="Boolean indicating whether to upscale frame focuses to the maximum value in the manifest")
+
     ## Missing functionality to wipe out old folders, manifests, error logs
 
     args = parser.parse_args()
@@ -255,5 +264,6 @@ if __name__ == "__main__":
         args.relative_path_to_frames_directory,
         args.relative_path_to_focus_output_folder,
         args.path_to_manifest_output_directory, 
-        timestamp=args.timestamp)
+        timestamp=args.timestamp,
+        upscale_to_maximum=bool(args.upscale))
 
