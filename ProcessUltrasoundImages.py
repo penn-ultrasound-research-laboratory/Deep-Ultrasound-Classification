@@ -10,25 +10,30 @@ from constants.ultrasoundConstants import (
     HSV_COLOR_THRESHOLD,
     HSV_GRAYSCALE_THRESHOLD,
     IMAGE_TYPE,
+    IMAGE_TYPE_LABEL,
     TUMOR_BENIGN,
     TUMOR_MALIGNANT,
     TUMOR_TYPES,
     TUMOR_TYPE_LABEL,
     TUMOR_UNSPECIFIED
 )
+
 import numpy as np
 
 import argparse
 import cv2
 import json
+import logging
 import os
+import uuid
 
-def process_patient(
+logger = logging.getLogger('processing')
+
+def process_patient_ocr(
     absolute_path_to_patient_folder, 
     relative_path_to_frames_folder, 
     relative_path_to_focus_output_folder,
     manifest_file_pointer,
-    failure_log_file_pointer,
     timestamp,
     patient_type_label=None):
     """Process an individual patient
@@ -40,7 +45,6 @@ def process_patient(
         relative_path_to_frames_folder: relative path from the patient folder to patient frames folder
         relative_path_to_focus_output_folder: relative path from the patient folder to frame focus output folder 
         manifest_file_pointer: file pointer to the manifest
-        failure_log_file_pointer: file pointer to the failure log
         timestamp: timestamp to postfix to focus output directory
 
     Optional:
@@ -66,60 +70,95 @@ def process_patient(
     if not os.path.isdir(absolute_path_to_focus_output_directory):
         os.mkdir(absolute_path_to_focus_output_directory)
 
-    frames = [name for name in os.listdir(absolute_path_to_frame_directory)]
+    # Set up frame objects
+    all_frames = [name for name in os.listdir(absolute_path_to_frame_directory)]
+    ocr_clear_frames = []
 
+    # Array storing all found & cleared text records
     found_text_records = []
-    for frame in frames:
-        print("Attempting frame: {}".format(frame))
+
+    #
+    # First pass over all data frames: 
+    # OCR to get frame scale, RAD/ARAD, etc 
+    #
+
+    for frame in all_frames:
+        logger.debug("Attempting text OCR for frame: {}".format(frame))
         try: 
             path_to_frame = "{}/{}".format(absolute_path_to_frame_directory, frame)
             bgr_image = cv2.imread(path_to_frame, cv2.IMREAD_COLOR)
 
             # Determine whether the frame is color or grayscale
-
             image_type = determine_image_type(bgr_image)
 
-            try:
-                if image_type is IMAGE_TYPE.COLOR:
+            # Always use the grayscale converted image for text isolation
+            grayscale_image = cv2.cvtColor(bgr_image, cv2.COLOR_BGR2GRAY)
+            grayscale_image = cv2.threshold(grayscale_image, 0, 255,
+                cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
 
-                    hash_path = get_color_image_focus(
-                        path_to_frame, 
-                        absolute_path_to_focus_output_directory, 
-                        np.array(HSV_COLOR_THRESHOLD.LOWER.value, np.uint8), 
-                        np.array(HSV_COLOR_THRESHOLD.UPPER.value, np.uint8))
+            found_text = isolate_text(grayscale_image, image_type)
 
-                else: 
-                    hash_path = get_grayscale_image_focus(
-                        path_to_frame, 
-                        absolute_path_to_focus_output_directory, 
-                        np.array(HSV_GRAYSCALE_THRESHOLD.LOWER.value, np.uint8), 
-                        np.array(HSV_GRAYSCALE_THRESHOLD.UPPER.value, np.uint8))
+            found_text[FRAME_LABEL] = os.path.basename(path_to_frame)
+            found_text[TUMOR_TYPE_LABEL] = patient_type_label
+            
+            found_text[IMAGE_TYPE_LABEL] = IMAGE_TYPE.COLOR.value if image_type is IMAGE_TYPE.COLOR else IMAGE_TYPE.GRAYSCALE.value
 
-                grayscale_image = cv2.cvtColor(bgr_image, cv2.COLOR_BGR2GRAY)
-                grayscale_image = cv2.threshold(grayscale_image, 0, 255,
-                    cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
-
-                found_text = isolate_text(grayscale_image, image_type)
-
-                found_text[FOCUS_HASH_LABEL] = hash_path
-                found_text[FRAME_LABEL] = os.path.basename(path_to_frame)
-                found_text[TUMOR_TYPE_LABEL] = patient_type_label
-                
-                found_text["IMAGE_TYPE"] = IMAGE_TYPE.COLOR.value if image_type is IMAGE_TYPE.COLOR else IMAGE_TYPE.GRAYSCALE.value
-
-                found_text_records.append(found_text)
-
-            except Exception as e:
-                # Image focus acquisition failed. Bubble up the error with frame information.
-                raise Exception("[{}, {}, {}] | {}".format(patient_label, frame, image_type, e))
+            ocr_clear_frames.append(frame)
 
         except Exception as e:
-                
             # Write the specific error in the failure log. Progress to the next frame
-            failure_log_file_pointer.write("{}\n".format(e))
+            logger.error("{}\n".format(e))
             continue
 
-        # Dump all valid records to the manifest
+    if self.auto_resize_to_manifest_scale_max:
+        try:
+            frame_scale = self.patient_frames[self.frame_index][SCALE_LABEL]
+            upscale_ratio = self.manifest_scale_max / frame_scale
+
+            logging.debug("Upscale Ratio: {}".format(upscale_ratio))
+
+            loaded_image = cv2.resize(
+                loaded_image, 
+                None, 
+                fx=upscale_ratio, 
+                fy=upscale_ratio, 
+                interpolation=cv2.INTER_CUBIC)
+
+        except:
+            logger.error("Unable to auto-resize. Frame {} does not have scale label".format(
+                self.patient_frames[self.frame_index][FOCUS_HASH_LABEL]
+            ))
+
+    #
+    # Second pass over frames that cleared OCR: 
+    # Segmentation to crop the frame's "focus"
+    # Ideally, the focus is a close crop of the tumor
+    #
+
+    for frame in ocr_clear_frames:    
+        try:
+            if image_type is IMAGE_TYPE.COLOR:
+
+                hash_path = get_color_image_focus(
+                    path_to_frame, 
+                    absolute_path_to_focus_output_directory, 
+                    np.array(HSV_COLOR_THRESHOLD.LOWER.value, np.uint8), 
+                    np.array(HSV_COLOR_THRESHOLD.UPPER.value, np.uint8))
+
+            else: 
+                hash_path = get_grayscale_image_focus(
+                    path_to_frame, 
+                    absolute_path_to_focus_output_directory, 
+                    np.array(HSV_GRAYSCALE_THRESHOLD.LOWER.value, np.uint8), 
+                    np.array(HSV_GRAYSCALE_THRESHOLD.UPPER.value, np.uint8))
+
+            found_text[FOCUS_HASH_LABEL] = hash_path
+            found_text_records.append(found_text)
+
+        except Exception as e:
+            # Write the specific error in the failure log. Progress to the next frame
+            logger.error("[{}, {}, {}] | {}".format(patient_label, frame, image_type, e))
+            continue
 
     return found_text_records
             
@@ -168,12 +207,7 @@ def process_patient_set(
         path_to_manifest_output_directory.rstrip("/"), 
         timestamp)
 
-    failure_log_absolute_path = "{}/failures_{}.txt".format(
-        path_to_manifest_output_directory.rstrip("/"),
-        timestamp)
-
     manifest_file = open(manifest_absolute_path, "a")
-    failures_file = open(failure_log_absolute_path, "a")
 
     # Process each individual patient
 
@@ -182,7 +216,7 @@ def process_patient_set(
         (path_to_malignant_top_level_directory, TUMOR_MALIGNANT)]
 
     patient_records = {}
-    patient_records["TIMESTAMP"] = timestamp
+
     for path, patient_type_label in all_patients:
 
         patient_subdirectories = [name for name in os.listdir(path) 
@@ -190,22 +224,23 @@ def process_patient_set(
 
         for patient in patient_subdirectories:
 
-            print("Processing patient: {}".format(patient))
+            logger.info("Processing patient: {}".format(patient))
 
             patient_directory_absolute_path = "{}/{}".format(
                 path.rstrip("/"),
                 patient)
 
-            acquired_records = process_patient(
+            acquired_records = process_patient_ocr(
                 patient_directory_absolute_path, 
                 relative_path_to_frames_folder, 
                 relative_path_to_focus_output_folder,
                 manifest_file,
-                failures_file,
                 timestamp,
                 patient_type_label)
 
             patient_records[patient] = acquired_records
+
+    patient_records["TIMESTAMP"] = timestamp
 
     # Dump the patient records to file
     json.dump(patient_records, manifest_file)
@@ -213,7 +248,6 @@ def process_patient_set(
     # Cleanup
 
     manifest_file.close()
-    failures_file.close()
 
 
 
@@ -257,6 +291,12 @@ if __name__ == "__main__":
     ## Missing functionality to wipe out old folders, manifests, error logs
 
     args = parser.parse_args()
+
+    logging.basicConfig(level = logging.INFO, filename = "{}/failures_{}_{}.log".format(
+        args.path_to_manifest_output_directory,
+        args.timestamp,
+        uuid.uuid4()
+    ))
 
     process_patient_set(
         args.path_to_benign_top_level_directory,
