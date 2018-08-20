@@ -259,10 +259,6 @@ def process_patient_set(
     Optional:
         timestamp: String timestamp to use instead of generating using the current time")
         upscale_to_maximum: second path over all generated focuses to resize them to the maximum value in the manifest. E.g. say the largest scale on a frame is 4.8 cm. Say the scale on a new frame is 3.0 cm. We then upscale the focus by a factor of 4.8 / 3.0. If the scale has no frame, the scale factor will be 4.8 / mean(all_frames)
-
-
-    Returns:
-        A tuple containing: (Integer: #sucesses, Integer: #failures)
     """
 
     timestamp =  timestamp if timestamp is not None else datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -310,7 +306,6 @@ def process_patient_set(
     json.dump(patient_records, manifest_file)
 
     # Cleanup
-
     manifest_file.close()
 
 
