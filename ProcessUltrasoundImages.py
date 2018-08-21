@@ -30,7 +30,7 @@ import uuid
 
 logger = logging.getLogger('processing')
 
-def process_patient_segmentation(
+def frame_segmentation(
     path_to_frame,
     absolute_path_to_focus_output_directory,
     image_type):
@@ -53,7 +53,7 @@ def process_patient_segmentation(
     return hash_path
 
 
-def process_patient_ocr(color_frame, image_type):
+def frame_ocr(color_frame, image_type):
     # Always use the grayscale converted image for text isolation
     grayscale_frame = cv2.cvtColor(color_frame, cv2.COLOR_BGR2GRAY)
     
@@ -83,13 +83,13 @@ def process_patient_ocr(color_frame, image_type):
     #             self.patient_frames[self.frame_index][FOCUS_HASH_LABEL]
     #         ))
             
-
-def process_patient(
+def patient_ocr(
     absolute_path_to_patient_folder, 
+    patient,
     relative_path_to_frames_folder, 
     relative_path_to_focus_output_folder,
-    manifest_file_pointer,
     timestamp,
+    composite_records=None,
     patient_type_label=None):
     """Process an individual patient
 
@@ -99,7 +99,6 @@ def process_patient(
         absolute_path_to_patient_folder: absolute path to patient folder
         relative_path_to_frames_folder: relative path from the patient folder to patient frames folder
         relative_path_to_focus_output_folder: relative path from the patient folder to frame focus output folder 
-        manifest_file_pointer: file pointer to the manifest
         timestamp: timestamp to postfix to focus output directory
 
     Optional:
@@ -109,8 +108,9 @@ def process_patient(
         A list of records for all cleanly processed patient frames
     """
 
-    # patient_label = os.path.basename(absolute_path_to_patient_folder)
+    BUILD_NEW_RECORDS = composite_records is None
 
+    # patient_label = os.path.basename(absolute_path_to_patient_folder)
     absolute_path_to_frame_directory = "{}/{}".format(
         absolute_path_to_patient_folder.rstrip("/"),
         relative_path_to_frames_folder)
@@ -128,13 +128,11 @@ def process_patient(
     # Set up frame objects
     individual_patient_frames = [name for name in os.listdir(absolute_path_to_frame_directory)]
     
-    # Array storing all found & cleared text records
-    compiled_patient_records = []
-
+    # Create an array to store all found & cleared text patient records if building the records from scratch
+    if BUILD_NEW_RECORDS:
+        compiled_patient_records = []
 
     ############################################################
-    # First pass over all data frames: 
-
     # OCR to get frame scale, RAD/ARAD, etc 
     ############################################################
 
@@ -146,27 +144,61 @@ def process_patient(
         # Determine whether the frame is color or grayscale
         image_type = determine_image_type(color_frame)
 
+        # Frame label (e.g. 00BER3003855)
+        frame_label = os.path.basename(path_to_frame)
+
+        # Run the OCR subroutine
         try:
             logger.info("Attempting text OCR for frame: {}".format(frame))
-            found_text = process_patient_ocr(color_frame, image_type)
-
-            # Augment the found text with standard frame information
-    
+            found_text = frame_ocr(color_frame, image_type)
+        except Exception as e:
+            logger.error("Failed text OCR for frame: {}. {}".format(frame, e))
+            continue
+        
+        if BUILD_NEW_RECORDS:
+            # Use the found text as a basis for a new frame record
             found_text[FRAME_LABEL] = os.path.basename(path_to_frame)
             found_text[TUMOR_TYPE_LABEL] = patient_type_label
-    
+
             if image_type is IMAGE_TYPE.COLOR:
                 found_text[IMAGE_TYPE_LABEL] = IMAGE_TYPE.COLOR.value
             else:
                 found_text[IMAGE_TYPE_LABEL] = IMAGE_TYPE.GRAYSCALE.value
 
             compiled_patient_records.append(found_text)
+        else:
+            # Get the reference to the current frame record
+            frame_record = [rec for rec in composite_records[patient] if rec[FRAME_LABEL] == frame_label]
             
-        except Exception as e:
-            logger.error("Failed text OCR for frame: {}. {}".format(frame, e))
-            continue
+            if len(frame_record) == 0:
+                logger.error("Frame record not in composite records: {}".format(frame_label))
+                continue
+
+            frame_record = frame_record[0]
+
+            # Augment the existing record with new frame information            
+            frame_record[FRAME_LABEL] = os.path.basename(path_to_frame)
+            frame_record[TUMOR_TYPE_LABEL] = patient_type_label
+
+            if image_type is IMAGE_TYPE.COLOR:
+                frame_record[IMAGE_TYPE_LABEL] = IMAGE_TYPE.COLOR.value
+            else:
+                frame_record[IMAGE_TYPE_LABEL] = IMAGE_TYPE.GRAYSCALE.value
+
+    # Either return the new records or reference to the composite records
+    if BUILD_NEW_RECORDS:
+        return compiled_patient_records
+    else:
+        return composite_records
 
 
+def patient_segmentation(
+    absolute_path_to_patient_folder, 
+    relative_path_to_frames_folder, 
+    relative_path_to_focus_output_folder,
+    timestamp,
+
+    patient_type_label=None):
     ############################################################
     # SECOND pass over frames that cleared OCR: 
     # 
@@ -187,7 +219,7 @@ def process_patient(
             logger.info("Attempting tumor segmentation for frame: {}".format(frame))
 
             # Get the tumor segmentation from the patient frame            
-            hash_path = process_patient_segmentation(
+            hash_path = frame_segmentation(
                 path_to_frame,
                 absolute_path_to_focus_output_directory,
                 image_type)
@@ -223,9 +255,6 @@ def process_patient(
         except Exception as e:
             logger.error("Failed tumor segmentation for frame: {}. {}".format(frame, e))
             continue
-            
-    return compiled_patient_records
-
 
 
 def process_patient_set(
@@ -284,21 +313,26 @@ def process_patient_set(
 
         for patient in patient_subdirectories:
 
-            logger.info("Processing patient: {}".format(patient))
+            logger.info("Pass 1 | Processing patient: {}".format(patient))
 
             patient_directory_absolute_path = "{}/{}".format(
                 path.rstrip("/"),
                 patient)
 
-            acquired_records = process_patient(
+            acquired_records = patient_ocr(
                 patient_directory_absolute_path, 
+                patient,
                 relative_path_to_frames_folder, 
                 relative_path_to_focus_output_folder,
-                manifest_file,
                 timestamp,
-                patient_type_label)
+                composite_records=None,
+                patient_type_label=patient_type_label)
 
             patient_records[patient] = acquired_records
+
+
+
+
 
     patient_records[TIMESTAMP_LABEL] = timestamp
 
@@ -306,6 +340,7 @@ def process_patient_set(
     json.dump(patient_records, manifest_file)
 
     # Cleanup
+
     manifest_file.close()
 
 
