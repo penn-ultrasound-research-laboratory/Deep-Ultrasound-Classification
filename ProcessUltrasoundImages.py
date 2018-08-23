@@ -210,21 +210,19 @@ def patient_segmentation(
     if BUILD_NEW_RECORDS:
         compiled_patient_records = []
 
-    for frame in individual_patient_frames:
+    for frame_label in individual_patient_frames:
 
-        path_to_frame = "{}/{}".format(absolute_path_to_frame_directory, frame)
-        frame_label = os.path.basename(path_to_frame)
-
+        path_to_frame = "{}/{}".format(absolute_path_to_frame_directory, frame_label)
         color_frame = cv2.imread(path_to_frame, cv2.IMREAD_COLOR)
 
         # Determine whether the frame is color or grayscale
         image_type = determine_image_type(color_frame)
         
         try:
-            logger.info("Attempting tumor segmentation for frame: {}".format(frame))
+            logger.info("Attempting tumor segmentation for frame: {}".format(frame_label))
 
             if interpolation_context is not None and not BUILD_NEW_RECORDS:
-                logger.info("Segmentation | Upscaling frame: {}".format(frame))
+                logger.info("Segmentation | Upscaling frame: {}".format(frame_label))
                 # Get the reference to the current frame record
                 frame_record = [rec for rec in composite_records[patient] if rec[FRAME_LABEL] == frame_label]
                 
@@ -235,14 +233,17 @@ def patient_segmentation(
                 frame_record = frame_record[0]
 
                 # If the scale is undefined, use the average frame scale
-                frame_scale = frame_record.get(RA.SCALE, interpolation_context[1])
-                interpolation_factor = interpolation_context[0] / frame_scale
+
+                found_scale = frame_record.get(RA.SCALE, interpolation_context[1])
+                found_scale = found_scale if found_scale is not None else interpolation_context[1]
+
+                interpolation_factor = interpolation_context[0] / found_scale
 
                 # Sanity check
                 if interpolation_factor > 5:
                     logger.error("Segmentation | Factor: {} exceeds limit for frame: {}".format(interpolation_factor, frame_label))
 
-                logger.info("Segmentation | Interpolation factor: {} | frame: {}".format(interpolation_factor, frame))
+                logger.info("Segmentation | Interpolation factor: {} | frame: {}".format(interpolation_factor, frame_label))
 
                 # Get the tumor segmentation from the patient frame            
                 hash_path = frame_segmentation(
@@ -288,7 +289,6 @@ def patient_segmentation(
 
     # Either return the new records or reference to the composite records
     return compiled_patient_records if BUILD_NEW_RECORDS else composite_records
-
 
 
 
@@ -414,8 +414,6 @@ def process_patient_set(
                 composite_records=patient_records,
                 patient_type_label=patient_type_label,
                 interpolation_context=interpolation_context)
-
-    patient_records[TIMESTAMP_LABEL] = timestamp
 
     # Dump the patient records to file
     manifest_absolute_path = "{}/manifest_{}.json".format(
