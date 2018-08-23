@@ -1,7 +1,7 @@
 # import the necessary packages
 from constants.ultrasoundConstants import (
 	IMAGE_TYPE,
-	READOUT_ABBREVS,
+	READOUT_ABBREVS as RA,
 	WALL_FILTER_MODES
 )
 
@@ -15,19 +15,6 @@ import cv2
 import argparse 
 import pytesseract 
 import uuid
-
-
-RADIALITY = READOUT_ABBREVS.RADIALITY.value
-COLOR_TYPE = READOUT_ABBREVS.COLOR_TYPE.value
-COLOR_MODE = READOUT_ABBREVS.COLOR_MODE.value
-ARAD = READOUT_ABBREVS.ARAD.value
-RAD = READOUT_ABBREVS.RAD.value
-CPA = READOUT_ABBREVS.CPA.value
-COLOR_LEVEL = READOUT_ABBREVS.COLOR_LEVEL.value
-WALL_FILTER = READOUT_ABBREVS.WALL_FILTER.value
-PRF = READOUT_ABBREVS.PULSE_REPITITION_FREQUENCY.value
-SCALE = READOUT_ABBREVS.SCALE.value
-SIZE = READOUT_ABBREVS.SIZE.value
 
 def isolate_text(grayscale_image, image_type):
 	
@@ -93,9 +80,9 @@ def isolate_text(grayscale_image, image_type):
 
 		base_10_mag = np.log10(max(scale_segments))
 		if base_10_mag > 0 and base_10_mag < 1:
-			FOUND_TEXT[SCALE] = max(scale_segments)
+			FOUND_TEXT[RA.SCALE] = max(scale_segments)
 		else:
-			FOUND_TEXT[SCALE] = None			
+			FOUND_TEXT[RA.SCALE] = None			
 
 	except Exception as e:
 		raise("Unable to isolate frame scale. " + e)
@@ -103,25 +90,25 @@ def isolate_text(grayscale_image, image_type):
 
 	# Isolate the frame radiality (RAD/ARAD)
 	try:
-		FOUND_TEXT[RADIALITY] = ARAD if ARAD in text_segments else RAD
+		FOUND_TEXT[RA.RADIALITY] = RA.ARAD if RA.ARAD in text_segments else RA.RAD
 	except Exception as e:
 		raise("Unable to isolate frame radiality. " + e)
 	
 
 	if image_type is IMAGE_TYPE.COLOR:
 
-		FOUND_TEXT[COLOR_MODE] = IMAGE_TYPE.COLOR
+		FOUND_TEXT[RA.COLOR_MODE] = IMAGE_TYPE.COLOR
 
-		CPA_check = len([ segment for segment in text_segments if CPA in segment]) == 1
-		COL_check = len([ segment for segment in text_segments if COLOR_LEVEL in segment]) == 1
+		CPA_check = len([ segment for segment in text_segments if RA.CPA in segment]) == 1
+		COL_check = len([ segment for segment in text_segments if RA.COLOR_LEVEL in segment]) == 1
 
 		if not CPA_check ^ COL_check:
 			raise IOError("Color/CPA text check did not pass for image")
 
 		# Find the color mode
 
-		found_mode = CPA if CPA_check else COLOR_LEVEL
-		FOUND_TEXT[COLOR_MODE] = found_mode
+		found_mode = RA.CPA if CPA_check else RA.COLOR_LEVEL
+		FOUND_TEXT[RA.COLOR_MODE] = found_mode
 
 		# Find the segment with CPA or COLOR
 		
@@ -140,36 +127,36 @@ def isolate_text(grayscale_image, image_type):
 		if divmod(color_level, 10)[0] == 3:
 			color_level = 80 + divmod(color_level, 10)[1]
 
-		FOUND_TEXT[COLOR_LEVEL] = color_level
+		FOUND_TEXT[RA.COLOR_LEVEL] = color_level
 
 		# Find the segment with Wall Filter (WF)
 
-		WF_check = len([ segment for segment in text_segments if WALL_FILTER in segment]) == 1
+		WF_check = len([ segment for segment in text_segments if RA.WALL_FILTER in segment]) == 1
 
 		if not WF_check:
 			raise IOError("Wall filter check did not pass for image. Incorrect matching segments")
 
-		wf_segment = [ segment for segment in text_segments if WALL_FILTER in segment][0]
-		wf_segment = wf_segment.replace(WALL_FILTER, "").strip()
+		wf_segment = [ segment for segment in text_segments if RA.WALL_FILTER in segment][0]
+		wf_segment = wf_segment.replace(RA.WALL_FILTER, "").strip()
 
 		if wf_segment not in WALL_FILTER_MODES:
 			# Can always improve to levenshtein if poor matching
 			raise IOError("Wall filter check did not pass for image. Incorrect mode: ${0}".format(wf_segment))
 
-		FOUND_TEXT[WALL_FILTER] = wf_segment
+		FOUND_TEXT[RA.WALL_FILTER] = wf_segment
 
 		# Find the segment with Pulse Repitition Frequency (PRF)
 
-		PRF_check = len([ segment for segment in text_segments if PRF in segment]) == 1
+		PRF_check = len([ segment for segment in text_segments if RA.PULSE_REPITITION_FREQUENCY in segment]) == 1
 
 		if not PRF_check:
 			raise IOError("PRF check did not pass for image. Incorrect matching segments")
 
-		prf_segment = [ segment for segment in text_segments if PRF in segment][0]
+		prf_segment = [ segment for segment in text_segments if RA.PULSE_REPITITION_FREQUENCY in segment][0]
 		
 		numerical_strings = [num_string for num_string in re.findall(r"[\d]+(?:\.[\d]+)*", prf_segment)]
 		numerical_strings = [ns.replace(".", "") for ns in numerical_strings]
-		FOUND_TEXT[PRF] = int(max(numerical_strings, key=len))
+		FOUND_TEXT[RA.PULSE_REPITITION_FREQUENCY] = int(max(numerical_strings, key=len))
 
 	return FOUND_TEXT
 

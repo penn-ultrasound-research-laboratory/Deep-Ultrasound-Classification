@@ -22,18 +22,27 @@ IMAGE_TYPE_LABEL = 'IMAGE_TYPE'
 NUMBER_CHANNELS_COLOR = 3
 NUMBER_CHANNELS_GRAYSCALE = 1
 
-class READOUT_ABBREVS(Enum):
-    COLOR_MODE = 'COLOR_MODE'
-    COLOR_TYPE = 'COLOR_TYPE'
-    RADIALITY = 'RADIALITY'
-    RAD = 'RAD'
-    ARAD = 'ARAD'
-    COLOR_LEVEL = 'COL'
-    CPA = 'CPA'
-    WALL_FILTER = 'WF'
-    PULSE_REPITITION_FREQUENCY = 'PRF'
-    SCALE = "SCALE"
-    SIZE = 'SIZE'
+# Inspiration: https://stackoverflow.com/questions/1363839/python-singleton-object-instantiation
+class ReadoutAbbrevs(object):
+    __instance = None
+
+    def __new__(cls):
+        if cls.__instance == None:
+            cls.__instance = object.__new__(cls)
+            cls.__instance.COLOR_MODE = 'COLOR_MODE'
+            cls.__instance.COLOR_TYPE = 'COLOR_TYPE'
+            cls.__instance.RADIALITY = 'RADIALITY'
+            cls.__instance.RAD = 'RAD'
+            cls.__instance.ARAD = 'ARAD'
+            cls.__instance.COLOR_LEVEL = 'COL'
+            cls.__instance.CPA = 'CPA'
+            cls.__instance.WALL_FILTER = 'WF'
+            cls.__instance.PULSE_REPITITION_FREQUENCY = 'PRF'
+            cls.__instance.SCALE = "SCALE"
+            cls.__instance.SIZE = 'SIZE'
+        return cls.__instance
+
+READOUT_ABBREVS = ReadoutAbbrevs()
 
 SCALE_LABEL = "SCALE"
 
