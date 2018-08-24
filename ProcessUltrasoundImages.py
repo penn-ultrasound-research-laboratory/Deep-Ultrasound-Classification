@@ -11,7 +11,9 @@ from constants.ultrasoundConstants import (
     HSV_GRAYSCALE_THRESHOLD,
     IMAGE_TYPE,
     IMAGE_TYPE_LABEL,
+    INTERPOLATION_FACTOR_LABEL,
     READOUT_ABBREVS as RA,
+    SCALE_LABEL,
     TIMESTAMP_LABEL,
     TUMOR_BENIGN,
     TUMOR_MALIGNANT,
@@ -232,16 +234,15 @@ def patient_segmentation(
 
                 frame_record = frame_record[0]
 
-                # If the scale is undefined, use the average frame scale
-
+                # If the scale is undefined, use the global average frame scale
                 found_scale = frame_record.get(RA.SCALE, interpolation_context[1])
                 found_scale = found_scale if found_scale is not None else interpolation_context[1]
 
-                interpolation_factor = interpolation_context[0] / found_scale
+                interpolation_factor = found_scale / interpolation_context[0]
 
                 # Sanity check
                 if interpolation_factor > 5:
-                    logger.error("Segmentation | Factor: {} exceeds limit for frame: {}".format(interpolation_factor, frame_label))
+                    logger.warning("Segmentation | Factor: {} exceeds limit for frame: {}".format(interpolation_factor, frame_label))
 
                 logger.info("Segmentation | Interpolation factor: {} | frame: {}".format(interpolation_factor, frame_label))
 
@@ -259,7 +260,7 @@ def patient_segmentation(
                     image_type)
 
         except Exception as e:
-            logger.error("Failed tumor segmentation for frame: {}. {}".format(frame, str(e)))
+            logger.error("Failed tumor segmentation for frame: {}. {}".format(frame_label, str(e)))
             continue
 
         if BUILD_NEW_RECORDS:
@@ -272,6 +273,10 @@ def patient_segmentation(
 
             # Use the found text as a basis for a new frame record
             new_record[FOCUS_HASH_LABEL] = hash_path
+
+            if interpolation_context is not None:
+                new_record[INTERPOLATION_FACTOR_LABEL] = interpolation_factor
+            
             compiled_patient_records.append(new_record)
             
         else:
@@ -283,6 +288,9 @@ def patient_segmentation(
                 continue
 
             frame_record = frame_record[0]
+
+            if interpolation_context is not None:
+                frame_record[INTERPOLATION_FACTOR_LABEL] = interpolation_factor
 
             # Augment the existing record with new frame information            
             frame_record[FOCUS_HASH_LABEL] = hash_path
@@ -326,6 +334,15 @@ def process_patient_set(
             the focus by a factor of 4.8 / 3.0. If the scale has no frame, the scale factor will be 4.8 / avg(all_frames)
     """
 
+    '''
+                                    ██████╗  ██████╗██████╗ 
+                                    ██╔═══██╗██╔════╝██╔══██╗
+                                    ██║   ██║██║     ██████╔╝
+                                    ██║   ██║██║     ██╔══██╗
+                                    ╚██████╔╝╚██████╗██║  ██║
+                                    ╚═════╝  ╚═════╝╚═╝  ╚═╝
+    '''
+
     ALL_PATIENTS = [
         (path_to_benign_top_level_directory, TUMOR_BENIGN),
         (path_to_malignant_top_level_directory, TUMOR_MALIGNANT)]
@@ -357,9 +374,23 @@ def process_patient_set(
 
             patient_records[patient_label] = acquired_records
 
+    '''
+    █████╗ ██╗   ██╗████████╗ ██████╗       ███████╗ ██████╗ █████╗ ██╗     ██╗███╗   ██╗ ██████╗ 
+    ██╔══██╗██║   ██║╚══██╔══╝██╔═══██╗      ██╔════╝██╔════╝██╔══██╗██║     ██║████╗  ██║██╔════╝ 
+    ███████║██║   ██║   ██║   ██║   ██║█████╗███████╗██║     ███████║██║     ██║██╔██╗ ██║██║  ███╗
+    ██╔══██║██║   ██║   ██║   ██║   ██║╚════╝╚════██║██║     ██╔══██║██║     ██║██║╚██╗██║██║   ██║
+    ██║  ██║╚██████╔╝   ██║   ╚██████╔╝      ███████║╚██████╗██║  ██║███████╗██║██║ ╚████║╚██████╔╝
+    ╚═╝  ╚═╝ ╚═════╝    ╚═╝    ╚═════╝       ╚══════╝ ╚═════╝╚═╝  ╚═╝╚══════╝╚═╝╚═╝  ╚═══╝ ╚═════╝                                                                                          
+    '''
     # Handle upscale to the maximum scale found in the corpus
     if upscale_to_maximum:
-        
+
+        logger.info("Scale to maximum flag TRUE. Attempting to get scale information.")
+        scale_minimum = 1000
+        scale_total = 0 
+        scale_count = 0
+        scale_average = 0
+
         # Process each individual patient
         for path, patient_type_label in ALL_PATIENTS:
 
@@ -368,26 +399,47 @@ def process_patient_set(
 
             for patient_label in patient_subdirectories:
 
-                logger.info("Scale to maximum flag TRUE. Attempting to get scale information.")
-                scale_maximum = 0
-                scale_total = 0 
-                scale_count = 0
-                scale_average = 0
+                frames_with_none = []
+                scale_histogram = {}
 
                 for frame in patient_records[patient_label]:
 
-                    found_scale = frame.get(RA.SCALE, 0)
-                    found_scale = found_scale if found_scale is not None else 0
+                    found_scale = frame.get(RA.SCALE, None)
 
-                    scale_maximum = max(found_scale, scale_maximum) 
-                    # Frames with no specified scale are not included in the average
-                    scale_total += found_scale
-                    scale_count += found_scale
-                
+                    if found_scale is not None:
+                        scale_minimum = min(found_scale, scale_minimum) 
+                        scale_total += found_scale
+                        scale_count += 1
+                        
+                        if found_scale in scale_histogram:
+                            scale_histogram[found_scale] += 1
+                        else:
+                            scale_histogram[found_scale] = 1
+                    else:
+                        # Frames with no specified scale are not included in the average
+                        frames_with_none.append(frame)
+
+                most_common_scale = max(scale_histogram, key=scale_histogram.get)
+
+                for frame_with_no_scale in frames_with_none:
+                    logger.info("Frame: {} missing scale. Updating with scale: {}".format(frame_with_no_scale[FRAME_LABEL], most_common_scale))
+
+                    frame_with_no_scale[SCALE_LABEL] = most_common_scale
+              
         scale_average = scale_total / scale_count
         
-        print("Scale to maximum. Maximum: {}. Average: {}".format(scale_maximum, scale_average))
-        logger.info("Scale to maximum. Maximum: {}. Average: {}".format(scale_maximum, scale_average))
+        print("Scale to minimum. minimum: {}. Average: {}".format(scale_minimum, scale_average))
+        logger.info("Scale to minimum. minimum: {}. Average: {}".format(scale_minimum, scale_average))
+
+    '''
+        ███████╗███████╗ ██████╗ ███╗   ███╗███████╗███╗   ██╗████████╗ █████╗ ████████╗██╗ ██████╗ ███╗   ██╗
+        ██╔════╝██╔════╝██╔════╝ ████╗ ████║██╔════╝████╗  ██║╚══██╔══╝██╔══██╗╚══██╔══╝██║██╔═══██╗████╗  ██║
+        ███████╗█████╗  ██║  ███╗██╔████╔██║█████╗  ██╔██╗ ██║   ██║   ███████║   ██║   ██║██║   ██║██╔██╗ ██║
+        ╚════██║██╔══╝  ██║   ██║██║╚██╔╝██║██╔══╝  ██║╚██╗██║   ██║   ██╔══██║   ██║   ██║██║   ██║██║╚██╗██║
+        ███████║███████╗╚██████╔╝██║ ╚═╝ ██║███████╗██║ ╚████║   ██║   ██║  ██║   ██║   ██║╚██████╔╝██║ ╚████║
+        ╚══════╝╚══════╝ ╚═════╝ ╚═╝     ╚═╝╚══════╝╚═╝  ╚═══╝   ╚═╝   ╚═╝  ╚═╝   ╚═╝   ╚═╝ ╚═════╝ ╚═╝  ╚═══╝
+                                                                                                            
+    '''
 
     for path, patient_type_label in ALL_PATIENTS:
 
@@ -402,7 +454,7 @@ def process_patient_set(
                 path.rstrip("/"),
                 patient_label)
 
-            interpolation_context = (scale_maximum, scale_average) if upscale_to_maximum else None
+            interpolation_context = (scale_minimum, scale_average) if upscale_to_maximum else None
 
             # Pass in complete records to update records in-place
             patient_segmentation(
@@ -471,10 +523,9 @@ if __name__ == "__main__":
 
     timestamp =  args.timestamp if args.timestamp is not None else datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
-    logging.basicConfig(level = logging.INFO, filename = "{}/failures_{}_{}.log".format(
+    logging.basicConfig(level = logging.INFO, filename = "{}/log_{}.log".format(
         args.path_to_manifest_output_directory,
-        timestamp,
-        uuid.uuid4()
+        timestamp
     ))
 
     process_patient_set(
