@@ -133,11 +133,11 @@ def patient_ocr(
         path_to_frame = "{}/{}".format(absolute_path_to_frame_directory, frame_label)
         color_frame = cv2.imread(path_to_frame, cv2.IMREAD_COLOR)
 
-        # Determine whether the frame is color or grayscale
-        image_type = determine_image_type(color_frame)
-
         # Run the OCR subroutine
         try:
+            # Determine whether the frame is color or grayscale
+            image_type = determine_image_type(color_frame)
+
             logger.info("Attempting text OCR for frame: {}".format(frame_label))
             found_text = frame_ocr(color_frame, image_type)
         except Exception as e:
@@ -217,10 +217,10 @@ def patient_segmentation(
         path_to_frame = "{}/{}".format(absolute_path_to_frame_directory, frame_label)
         color_frame = cv2.imread(path_to_frame, cv2.IMREAD_COLOR)
 
-        # Determine whether the frame is color or grayscale
-        image_type = determine_image_type(color_frame)
-        
         try:
+            # Determine whether the frame is color or grayscale
+            image_type = determine_image_type(color_frame)
+            
             logger.info("Attempting tumor segmentation for frame: {}".format(frame_label))
 
             if interpolation_context is not None and not BUILD_NEW_RECORDS:
