@@ -1,5 +1,7 @@
 *.png
 *.jpg
+*.log
+*.json
 
 *.npy
 

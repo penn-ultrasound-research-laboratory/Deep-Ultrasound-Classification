@@ -4,8 +4,14 @@ import numpy as np
 from constants.ultrasoundConstants import HSV_COLOR_THRESHOLD
 
 
-def get_color_image_focus(path_to_image, path_to_output_directory, HSV_lower_bound, HSV_upper_bound):
-    '''
+def get_color_image_focus(
+    path_to_image, 
+    path_to_output_directory, 
+    HSV_lower_bound, 
+    HSV_upper_bound,
+    interpolation_factor=None,
+    interpolation_method=cv2.INTER_CUBIC):
+    """
     Determines the "focus" of an ultrasound frame in Color/CPA. 
 
     Ultrasound frames in Color/CPA mode highlight the tumor under examination to 
@@ -24,7 +30,7 @@ def get_color_image_focus(path_to_image, path_to_output_directory, HSV_lower_bou
     Raises:
         IOError: in case of any errors with OpenCV or file operations 
 
-    '''
+    """
     try:
         
         # Load the image and convert it to HSV from BGR
@@ -39,7 +45,7 @@ def get_color_image_focus(path_to_image, path_to_output_directory, HSV_lower_bou
         contours = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)[1]
 
         if len(contours) == 0:
-             raise Exception('Unable to find any matching contours.')
+             raise Exception("Unable to find any matching contours.")
 
         # Contour with maximum enclosed area corresponds to highlight rectangle
 
@@ -60,7 +66,7 @@ def get_color_image_focus(path_to_image, path_to_output_directory, HSV_lower_bou
         contours = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)[1]
 
         if len(contours) == 0:
-            raise Exception('Unable to find any matching contours.')
+            raise Exception("Unable to find any matching contours.")
 
         #find the biggest area
         max_contour = max(contours, key = cv2.contourArea)
@@ -72,22 +78,31 @@ def get_color_image_focus(path_to_image, path_to_output_directory, HSV_lower_bou
 
         cropped_image = focus_bgr_image[y+3:y+h-3, x+3:x+w-3]
 
-        output_path = '{0}/{1}.png'.format(path_to_output_directory, uuid.uuid4())
+        # Interpolate (upscale/downscale) the found segment if an interpolation factor is passed
+        if interpolation_factor is not None:
+            cropped_image = cv2.resize(
+                cropped_image, 
+                None, 
+                fx=interpolation_factor, 
+                fy=interpolation_factor, 
+                interpolation=interpolation_method)
+
+        output_path = "{0}/{1}.png".format(path_to_output_directory, uuid.uuid4())
 
         cv2.imwrite(output_path, cropped_image)
 
         return output_path
 
     except Exception as e:
-        raise IOError('Error isolating and saving image focus. ' + str(e))
+        raise IOError("Error isolating and saving image focus. " + str(e))
 
-if __name__ == '__main__':
+if __name__ == "__main__":
 
     # construct the argument parse and parse the arguments
     ap = argparse.ArgumentParser()
 
     ap.add_argument("-i", "--image", required=True,
-        help="path to input image to be OCR'd")
+        help="path to input image target of OCR subroutine")
 
     ap.add_argument("-p", "--preprocess", type=str, default="thresh",
         help="type of preprocessing to be done")
@@ -95,7 +110,7 @@ if __name__ == '__main__':
     args = vars(ap.parse_args())
 
     get_color_image_focus(
-        args['image'],
-        '.', 
+        args["image"],
+        ".", 
         np.array(HSV_COLOR_THRESHOLD.LOWER.value, np.uint8), 
         np.array(HSV_COLOR_THRESHOLD.UPPER.value, np.uint8))
