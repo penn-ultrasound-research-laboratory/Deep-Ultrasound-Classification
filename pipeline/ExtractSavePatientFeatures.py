@@ -29,7 +29,6 @@ from constants.modelConstants import (
 from keras.losses import categorical_crossentropy
 from keras.optimizers import Adam
 from keras.models import Model
-from keras.applications import inception_resnet_v2
 from keras.preprocessing.image import ImageDataGenerator
 
 logger = logging.getLogger('research')

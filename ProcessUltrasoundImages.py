@@ -512,7 +512,7 @@ if __name__ == "__main__":
                         help="timestamp to use instead of generating one using the current time")
 
     parser.add_argument("-up",
-                        "--upscale",
+                        "--upscale",w
                         type=int,
                         default=0,
                         help="Boolean indicating whether to upscale frame focuses to the maximum value in the manifest")
