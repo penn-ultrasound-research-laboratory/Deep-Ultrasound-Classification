@@ -7,7 +7,7 @@ import numpy as np
 import tensorflow as tf
 
 from utilities.patientsPartition import patient_train_test_validation_split
-from models.PatientSampleGenerator import PatientSampleGenerator
+from pipeline.PatientSampleGenerator import PatientSampleGenerator
 
 from models.resNet50 import ResNet50
 
