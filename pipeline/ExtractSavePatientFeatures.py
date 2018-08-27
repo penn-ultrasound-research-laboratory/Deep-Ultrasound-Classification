@@ -7,7 +7,7 @@ import numpy as np
 import tensorflow as tf
 
 from utilities.patientsPartition import patient_train_test_validation_split
-from models.PatientSampleGenerator import PatientSampleGenerator
+from pipeline.PatientSampleGenerator import PatientSampleGenerator
 
 from models.resNet50 import ResNet50
 
@@ -29,7 +29,6 @@ from constants.modelConstants import (
 from keras.losses import categorical_crossentropy
 from keras.optimizers import Adam
 from keras.models import Model
-from keras.applications import inception_resnet_v2
 from keras.preprocessing.image import ImageDataGenerator
 
 logger = logging.getLogger('research')

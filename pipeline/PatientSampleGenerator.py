@@ -8,6 +8,7 @@ from constants.ultrasoundConstants import (
     TUMOR_MALIGNANT,
     TUMOR_TYPE_LABEL,
     FOCUS_HASH_LABEL,
+    FRAME_LABEL,
     SCALE_LABEL)
 from constants.modelConstants import (
     DEFAULT_BATCH_SIZE,
@@ -111,10 +112,10 @@ class PatientSampleGenerator:
         self.cleared_patients = cleared_patients
         self.patient_index = self.frame_index = 0
 
-        self.__update_current_patient_information()
+        self.__load_current_patient_frames_into_generator()
 
 
-    def __update_current_patient_information(self):
+    def __load_current_patient_frames_into_generator(self):
         """Private method to update current patient information based on patient_index"""
 
         self.patient_id = self.cleared_patients[self.patient_index]
@@ -130,24 +131,37 @@ class PatientSampleGenerator:
             self.patient_frames = [
                 frame for frame in all_patient_frames if frame[IMAGE_TYPE_LABEL] == self.image_type.value]
 
+    def __move_to_next_generator_patient_frame_state(self, current_is_last_frame, current_is_last_patient):
+        if not current_is_last_frame:
+            self.frame_index += 1
+        elif current_is_last_patient:
+
+            if self.kill_on_last_patient:
+                raise StopIteration("Reached the last patient. Terminating PatientSampleGenerator.")
+
+            self.patient_index = 0
+            self.frame_index = 0
+            self.__load_current_patient_frames_into_generator()
+        else:
+            self.patient_index += 1
+            self.frame_index = 0
+            self.__load_current_patient_frames_into_generator()
+
     def __next__(self):
 
         while True:
-
-            skip_flag = False
 
             current_frame_color = self.patient_frames[self.frame_index][IMAGE_TYPE_LABEL]
             is_last_frame = self.frame_index == len(self.patient_frames) - 1
             is_last_patient = self.patient_index == len(self.cleared_patients) - 1
 
-            top_level_path = (
-                self.benign_top_level_path if self.patient_type == TUMOR_BENIGN 
-                else self.malignant_top_level_path)
-
-            focus_directory = (
-                "focus" if self.timestamp is None 
-                else "focus_{}".format(self.timestamp))
-
+            # Skip past frames that have no corresponding focus, most likely due to error in segmentation subroutine
+            
+            if FOCUS_HASH_LABEL not in self.patient_frames[self.frame_index]:
+                logging.info("No focus in record: {} | frame: {}".format(self.patient_id, self.patient_frames[self.frame_index][FRAME_LABEL]))
+                self.__move_to_next_generator_patient_frame_state(is_last_frame, is_last_patient)
+                continue
+                
             color_mode = (
                 cv2.IMREAD_COLOR if current_frame_color == IMAGE_TYPE.COLOR.value
                 else cv2.IMREAD_GRAYSCALE)
@@ -167,7 +181,10 @@ class PatientSampleGenerator:
             if loaded_image is None or len(loaded_image.shape) < 2:
                 logging.info("Skipping due to corruption: {} | frame: {}".format(self.patient_id, self.patient_frames[self.frame_index][FOCUS_HASH_LABEL]))
                 # Stored image is corrupted. Skip to next frame. 
-                skip_flag = True
+                
+                self.__move_to_next_generator_patient_frame_state(is_last_frame, is_last_patient)
+                continue
+
             else:
 
                 if self.auto_resize_to_manifest_scale_max:
@@ -223,33 +240,19 @@ class PatientSampleGenerator:
 
                     logging.debug("Used image data generator to transform input image to shape: {}".format(raw_image_batch.shape))
 
-            if not is_last_frame:
+            logging.info("Training on patient: {} | color: {} | frame: {}".format(self.patient_id, current_frame_color, self.patient_frames[self.frame_index][FOCUS_HASH_LABEL]))
 
-                self.frame_index += 1
-            
-            elif is_last_patient:
+            self.__move_to_next_generator_patient_frame_state(is_last_frame, is_last_patient)
 
-                if self.kill_on_last_patient:
-                    raise StopIteration("Reached the last patient. Terminating PatientSampleGenerator.")
-
-                self.patient_index = 0
-                self.frame_index = 0
-                self.__update_current_patient_information()
+            if self.use_categorical:
+                yield (
+                    raw_image_batch, 
+                    to_categorical(np.repeat(frame_label, self.batch_size), 
+                    num_classes=2))
             else:
-                self.patient_index += 1
-                self.frame_index = 0
-                self.__update_current_patient_information()
-           
-            # Class outputs must be categorical. 
-            if not skip_flag:
-                logging.info("Training on patient: {} | color: {} | frame: {}".format(self.patient_id, current_frame_color, self.patient_frames[self.frame_index][FOCUS_HASH_LABEL]))
-
-                if self.use_categorical:
-                    yield (raw_image_batch, to_categorical(np.repeat(frame_label, self.batch_size), num_classes=2))
-                else:
-                    yield (raw_image_batch, np.repeat(frame_label, self.batch_size))
-            else:
-                continue
+                yield (
+                    raw_image_batch, 
+                    np.repeat(frame_label, self.batch_size))
 
         return
 
@@ -259,8 +262,10 @@ if __name__ == "__main__":
 
     dirname = os.path.dirname(__file__)
 
-    with open(os.path.abspath("../ProcessedDatasets/2018-08-04_16-19-39/manifest_2018-08-04_16-19-39.json"), "r") as fp:
+    with open(os.path.abspath("../ProcessedDatasets/2018-08-25/manifest_2018-08-25_18-52-25.json"), "r") as fp:
         manifest = json.load(fp)
+
+    logging.basicConfig(level = logging.INFO, filename = "./main_output.log")
 
     # W/ aim of generating graphics for paper / email. Featurwise normalize according to mean or std. That should be used only in image preprocessing pipeline. Issue is that negative scaled values are meaningless when saving to file or displaying as negative values are truncated to zero. 
 
@@ -273,8 +278,7 @@ if __name__ == "__main__":
 
     # Limit to small subset of patients
 
-    patient_sample_generator = next(PatientSampleGenerator(
-        [("30BRO3007451", "BENIGN"),
+    patient_sample_generator = next(PatientSampleGenerator([
             ("01PER2043096", "BENIGN"),
             ("79BOY3049163", "MALIGNANT"),
             ("93KUD3041008", "MALIGNANT")],
@@ -285,9 +289,9 @@ if __name__ == "__main__":
         target_shape=[220, 220],
         image_type=IMAGE_TYPE.ALL,
         image_data_generator=image_data_generator,
-        timestamp="2018-08-04_16-19-39",
+        timestamp="2018-08-25_18-52-25",
         batch_size=BATCH_SIZE,
-        auto_resize_to_manifest_scale_max=True,
+        auto_resize_to_manifest_scale_max=False,
         kill_on_last_patient=True
     ))
 
