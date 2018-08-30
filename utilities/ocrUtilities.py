@@ -23,47 +23,32 @@ def isolate_text(grayscale_image, image_type):
 	# Hardcoded cropping bounds based on the specific ultrasound dataset
 	# TODO: move to constants file
 
-	left_bar_crop= grayscale_image[50:, :100]
-	bottom_left_crop = grayscale_image[365:, 30:140]
-	scale_crop = grayscale_image[15:40, 585:]
-
-	# write the grayscale image to disk as a temporary file so we can apply OCR to it
-
-	left_bar_filename = "{}.png".format(uuid.uuid4())
-	cv2.imwrite(left_bar_filename, left_bar_crop)
-
-	bottom_left_filename = "{}.png".format(uuid.uuid4())
-	cv2.imwrite(bottom_left_filename, bottom_left_crop)
-
-	scale_crop_filename = "{}.png".format(uuid.uuid4())
-	cv2.imwrite(scale_crop_filename, scale_crop)
+	left_bar_crop= grayscale_image[50:, :100].copy()
+	bottom_left_crop = grayscale_image[365:, 30:140].copy()
+	scale_crop = grayscale_image[15:40, 585:].copy()
 
 	# load the image as a PIL/Pillow image, apply OCR, and then delete
 	# the temporary file. Tesseract segmentation mode 11 is critical for this to work
 	# None of the other automatic segmentation modes correctly read the text
 
-	raw_text = pytesseract.image_to_string(Image.open(left_bar_filename),
+	raw_text = pytesseract.image_to_string(left_bar_crop,
 		lang="eng",
 		boxes=False,  
-		config="--psm 11") 
+		config=r"--psm 11") 
 
 	# Specifically whitelist numerical characters and "." to aid the OCR engine
 
-	raw_text_size = pytesseract.image_to_string(Image.open(bottom_left_filename),
+	raw_text_size = pytesseract.image_to_string(bottom_left_crop,
 		lang="eng",
 		boxes=False,  
-		config="--psm 11 -c tessedit_char_whitelist=0123456789.") 
+		config=r"--psm 11 -c tessedit_char_whitelist=0123456789.") 
 
 	# Specifically whitelist numerical characters and "." to aid the OCR engine
 
-	raw_text_scale = pytesseract.image_to_string(Image.open(scale_crop_filename),
+	raw_text_scale = pytesseract.image_to_string(scale_crop,
 		lang="eng",
 		boxes=False,  
-		config="--psm 11 -c tessedit_char_whitelist=0123456789.") 
-
-	os.remove(left_bar_filename)
-	os.remove(bottom_left_filename)
-	os.remove(scale_crop_filename)
+		config=r"--psm 11 -c tessedit_char_whitelist=0123456789.") 
 
 	text_segments = raw_text.splitlines()
 	text_segments = [segment.upper().strip() for segment in text_segments if segment is not ""]
@@ -160,9 +145,9 @@ def isolate_text(grayscale_image, image_type):
 
 	return FOUND_TEXT
 
+
+
 if __name__ == "__main__":
-
-
 	# construct the argument parse and parse the arguments
 	parser = argparse.ArgumentParser()
 

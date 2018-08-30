@@ -9,8 +9,6 @@ import tensorflow as tf
 from utilities.patientsPartition import patient_train_test_validation_split
 from pipeline.PatientSampleGenerator import PatientSampleGenerator
 
-from models.resNet50 import ResNet50
-
 from constants.exceptions.customExceptions import ExtractSavePatientFeatureException
 
 from constants.ultrasoundConstants import (
@@ -24,11 +22,15 @@ from constants.modelConstants import (
     SAMPLE_WIDTH,
     SAMPLE_HEIGHT,
     INCEPTION_RESNET_V2_WIDTH,
-    INCEPTION_RESNET_V2_HEIGHT)
+    INCEPTION_RESNET_V2_HEIGHT,
+    RESNET_50_HEIGHT,
+    RESNET_50_WIDTH)
     
 from keras.losses import categorical_crossentropy
 from keras.optimizers import Adam
 from keras.models import Model
+from keras.applications import inception_resnet_v2
+from keras.applications import resnet50
 from keras.preprocessing.image import ImageDataGenerator
 
 logger = logging.getLogger('research')
@@ -41,7 +43,7 @@ def extract_save_patient_features(
     batch_size=DEFAULT_BATCH_SIZE,
     image_data_generator=None,
     image_type=IMAGE_TYPE.ALL,
-    target_shape=[INCEPTION_RESNET_V2_HEIGHT, INCEPTION_RESNET_V2_WIDTH],
+    target_shape=[RESNET_50_HEIGHT, RESNET_50_WIDTH],
     timestamp=None):
     """Builds and saves a Numpy dataset with Resnet extracted features
 
@@ -69,21 +71,21 @@ def extract_save_patient_features(
     try:
         
         # When include_top=True input shape must be 224,224
-        # base_model = ResNet50(
-        #     include_top=True,
-        #     input_shape=tuple(target_shape) + (RESNET50_REQUIRED_NUMBER_CHANNELS,),
-        #     weights='imagenet')
-
-        base_model = inception_resnet_v2.InceptionResNetV2(
+        base_model = resnet50.ResNet50(
             include_top=True,
             classes=2,
             weights=None)
 
+        # base_model = inception_resnet_v2.InceptionResNetV2(
+        #     include_top=True,
+        #     classes=2,
+        #     weights=None)
+
         # Pre-softmax layer may be way too late
         model = Model(
             input=base_model.input,
-            output=base_model.get_layer('conv_7b_bn').output)
-        
+            output=base_model.get_layer('avg_pool').output)
+
         # Load the patient manifest
         with open(manifest_path, 'r') as f:
             manifest = json.load(f) 
@@ -124,7 +126,7 @@ def extract_save_patient_features(
             image_data_generator = image_data_generator,
             timestamp = timestamp,
             kill_on_last_patient = True,
-            auto_resize_to_manifest_scale_max=True)
+            auto_resize_to_manifest_scale_max=False)
 
         test_sample_generator = PatientSampleGenerator(
             test_partition,
@@ -137,7 +139,7 @@ def extract_save_patient_features(
             image_data_generator = image_data_generator,
             timestamp = timestamp,
             kill_on_last_patient = True,
-            auto_resize_to_manifest_scale_max = True)
+            auto_resize_to_manifest_scale_max=False)
 
         X_training = y_training = None
         try:
@@ -242,7 +244,7 @@ if __name__ == '__main__':
     parser.add_argument("-ts",
                         "--target_shape",
                         type = list,
-                        default = [INCEPTION_RESNET_V2_HEIGHT, INCEPTION_RESNET_V2_WIDTH],
+                        default = [RESNET_50_HEIGHT, RESNET_50_WIDTH],
                         help = "Size to use for image samples of taken frames. Used to pad frames that are smaller the target shape, and crop-sample images that are larger than the target shape")
 
     parser.add_argument('-T', '--timestamp',

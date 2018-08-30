@@ -40,7 +40,7 @@ def train_evaluate_linear_classifier(path_to_numpy_data_file):
             data["test_labels"],
             shuffle=False,
             num_epochs=1),
-        train_steps=2000)
+        train_steps=1000)
 
     experiment.train_and_evaluate()
 
