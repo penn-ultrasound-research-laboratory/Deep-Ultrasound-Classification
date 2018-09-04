@@ -176,11 +176,11 @@ def extract_save_patient_features(
         X_training = np.empty((batch_size * training_count, output_feature_shape[1]))
         X_test = np.empty((batch_size * test_count, output_feature_shape[1]))
         print("Final training features output shape: {}".format(X_training.shape))
-        print("Final training classes output shape: {}".format(X_test.shape))
+        print("Final test features output shape: {}".format(X_test.shape))
     
-        y_training = np.empty((training_count * batch_size, 1))
-        y_test = np.empty((test_count * ,batch_size, 1))
-        print("Final test features output shape: {}".format(y_training.shape))
+        y_training = np.empty(training_count * batch_size)
+        y_test = np.empty(test_count * batch_size)
+        print("Final training classes output shape: {}".format(y_training.shape))
         print("Final test classes output shape: {}".format(y_test.shape))
 
         # Insantiate fresh generators
@@ -222,7 +222,7 @@ def extract_save_patient_features(
             current_classes = current_batch[1]
 
             X_training[batch_size*bx:batch_size*(bx+1), :] = current_features
-            y_training[batch_size*bx:batch_size*(bx+1), 1] = current_classes
+            y_training[batch_size*bx:batch_size*(bx+1)] = current_classes
 
         # Extract test features
         
@@ -231,8 +231,8 @@ def extract_save_patient_features(
             current_features = np.squeeze(model.predict(current_batch[0]))
             current_classes = current_batch[1]
 
-            X_test[batch_size*bx:batch_size*(bx+1), 1] = current_features
-            y_test[batch_size*bx:batch_size*(bx+1), :] = current_classes
+            X_test[batch_size*bx:batch_size*(bx+1), :] = current_features
+            y_test[batch_size*bx:batch_size*(bx+1)] = current_classes
 
         output_hash = uuid.uuid4()
 
