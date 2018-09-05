@@ -22,6 +22,8 @@ from constants.ultrasoundConstants import (
     TUMOR_UNSPECIFIED
 )
 
+from tqdm import tqdm
+
 import numpy as np
 
 import argparse
@@ -350,12 +352,12 @@ def process_patient_set(
     patient_records = {}
 
     # Process each individual patient
-    for path, patient_type_label in ALL_PATIENTS:
+    for path, patient_type_label in tqdm(ALL_PATIENTS, desc="OCR"):
 
         patient_subdirectories = [name for name in os.listdir(path) 
             if os.path.isdir(os.path.join(path, name))]
 
-        for patient_label in patient_subdirectories:
+        for patient_label in tqdm(patient_subdirectories, desc=patient_type_label, leave=False):
 
             logger.info("OCR | Processing patient: {}".format(patient_label))
 
@@ -392,12 +394,12 @@ def process_patient_set(
         scale_average = 0
 
         # Process each individual patient
-        for path, patient_type_label in ALL_PATIENTS:
+        for path, patient_type_label in tqdm(ALL_PATIENTS, desc="Auto-scale"):
 
             patient_subdirectories = [name for name in os.listdir(path) 
                 if os.path.isdir(os.path.join(path, name))]
 
-            for patient_label in patient_subdirectories:
+            for patient_label in tqdm(patient_subdirectories, desc=patient_type_label, leave=False):
 
                 frames_with_none = []
                 scale_histogram = {}
@@ -441,12 +443,12 @@ def process_patient_set(
                                                                                                             
     '''
 
-    for path, patient_type_label in ALL_PATIENTS:
+    for path, patient_type_label in tqdm(ALL_PATIENTS, desc="Segmentation"):
 
         patient_subdirectories = [name for name in os.listdir(path) 
             if os.path.isdir(os.path.join(path, name))]
 
-        for patient_label in patient_subdirectories:
+        for patient_label in tqdm(patient_subdirectories, desc=patient_type_label, leave=False):
 
             logger.info("SEGMENTATION | Processing patient: {}".format(patient_label))
 
@@ -512,7 +514,7 @@ if __name__ == "__main__":
                         help="timestamp to use instead of generating one using the current time")
 
     parser.add_argument("-up",
-                        "--upscale",w
+                        "--upscale",
                         type=int,
                         default=0,
                         help="Boolean indicating whether to upscale frame focuses to the maximum value in the manifest")
@@ -523,7 +525,7 @@ if __name__ == "__main__":
 
     timestamp =  args.timestamp if args.timestamp is not None else datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
-    logging.basicConfig(level = logging.INFO, filename = "{}/log_{}.log".format(
+    logging.basicConfig(level = logging.INFO, filename = "{}/preprocess_{}.log".format(
         args.path_to_manifest_output_directory,
         timestamp
     ))

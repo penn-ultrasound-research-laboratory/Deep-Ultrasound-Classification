@@ -6,10 +6,9 @@ import uuid
 import numpy as np
 import tensorflow as tf
 
+from tqdm import tqdm
 from utilities.patientsPartition import patient_train_test_validation_split
 from pipeline.PatientSampleGenerator import PatientSampleGenerator
-
-from models.resNet50 import ResNet50
 
 from constants.exceptions.customExceptions import ExtractSavePatientFeatureException
 
@@ -24,11 +23,13 @@ from constants.modelConstants import (
     SAMPLE_WIDTH,
     SAMPLE_HEIGHT,
     INCEPTION_RESNET_V2_WIDTH,
-    INCEPTION_RESNET_V2_HEIGHT)
+    INCEPTION_RESNET_V2_HEIGHT,
+    RESNET_50_HEIGHT,
+    RESNET_50_WIDTH)
     
-from keras.losses import categorical_crossentropy
-from keras.optimizers import Adam
 from keras.models import Model
+from keras.applications import inception_resnet_v2
+from keras.applications import resnet50
 from keras.preprocessing.image import ImageDataGenerator
 
 logger = logging.getLogger('research')
@@ -41,8 +42,9 @@ def extract_save_patient_features(
     batch_size=DEFAULT_BATCH_SIZE,
     image_data_generator=None,
     image_type=IMAGE_TYPE.ALL,
-    target_shape=[INCEPTION_RESNET_V2_HEIGHT, INCEPTION_RESNET_V2_WIDTH],
-    timestamp=None):
+    target_shape=[RESNET_50_HEIGHT, RESNET_50_WIDTH],
+    timestamp=None,
+    override_filename_prefix=None):
     """Builds and saves a Numpy dataset with Resnet extracted features
 
     Arguments:
@@ -69,21 +71,21 @@ def extract_save_patient_features(
     try:
         
         # When include_top=True input shape must be 224,224
-        # base_model = ResNet50(
-        #     include_top=True,
-        #     input_shape=tuple(target_shape) + (RESNET50_REQUIRED_NUMBER_CHANNELS,),
-        #     weights='imagenet')
-
-        base_model = inception_resnet_v2.InceptionResNetV2(
+        base_model = resnet50.ResNet50(
             include_top=True,
             classes=2,
             weights=None)
 
+        # base_model = inception_resnet_v2.InceptionResNetV2(
+        #     include_top=True,
+        #     classes=2,
+        #     weights=None)
+
         # Pre-softmax layer may be way too late
         model = Model(
             input=base_model.input,
-            output=base_model.get_layer('conv_7b_bn').output)
-        
+            output=base_model.get_layer('avg_pool').output)
+
         # Load the patient manifest
         with open(manifest_path, 'r') as f:
             manifest = json.load(f) 
@@ -111,7 +113,7 @@ def extract_save_patient_features(
         logging.info("Training Partition: {}".format(len(training_partition)))
         logging.info("Test Partition: {}".format(len(test_partition)))
 
-        # PatientSampleGenerator over the training patients
+        # Instantiate generators over training/test/(validation) partitions
 
         training_sample_generator = PatientSampleGenerator(
             training_partition,
@@ -124,7 +126,7 @@ def extract_save_patient_features(
             image_data_generator = image_data_generator,
             timestamp = timestamp,
             kill_on_last_patient = True,
-            auto_resize_to_manifest_scale_max=True)
+            auto_resize_to_manifest_scale_max=False)
 
         test_sample_generator = PatientSampleGenerator(
             test_partition,
@@ -137,56 +139,111 @@ def extract_save_patient_features(
             image_data_generator = image_data_generator,
             timestamp = timestamp,
             kill_on_last_patient = True,
-            auto_resize_to_manifest_scale_max = True)
+            auto_resize_to_manifest_scale_max=False)
 
-        X_training = y_training = None
+        # Count the number of training and test samples - unknown at runtime due to randomized partition and
+        # OCR/segmentation errors in preprocessing
+
+        training_count = 0
+        test_count = 0
         try:
             gen = next(training_sample_generator)
             while True:
-                current_batch = next(gen)
-                current_predictions = model.predict(current_batch[0])
+                if training_count == 0:
+                    current_batch = next(gen)
+                    current_features = model.predict(current_batch[0])
+                    output_feature_shape = np.squeeze(current_features).shape
 
-                logger.info("Current predictions shape: {}".format(current_predictions.shape))
+                    print("Features shape determined to be: {}".format(current_features.shape))
+                    print("Compressed feature shape: {}".format(np.squeeze(current_features).shape))
+                    print("Sample classes shape: {}".format(current_batch[1].shape))
+                else:
+                    next(gen)
+                
+                training_count += 1
+        except:
+            logger.info("Training count number samples: {}".format(training_count))
 
-                X_training = current_predictions if X_training is None else np.concatenate((
-                    X_training, 
-                    current_predictions), 
-                    axis=0)
-
-                y_training = current_batch[1] if y_training is None else np.concatenate((
-                    y_training,
-                    current_batch[1]),
-                    axis=0)
-
-        except Exception as e:
-            logging.error(e)
-
-        X_test = y_test = None
         try:
             gen = next(test_sample_generator)
             while True:
-                current_batch = next(gen)
-                current_predictions = model.predict(current_batch[0])
+                next(gen)
+                test_count += 1
+        except:
+            logger.info("Test count number samples: {}".format(test_count))
 
-                logger.info("Current predictions shape: {}".format(current_predictions.shape))
+        ## Preallocate output feature matrix
 
-                X_test = current_predictions if X_test is None else np.concatenate((
-                    X_test, 
-                    current_predictions), 
-                    axis=0)
+        X_training = np.empty((batch_size * training_count, output_feature_shape[1]))
+        X_test = np.empty((batch_size * test_count, output_feature_shape[1]))
+        print("Final training features output shape: {}".format(X_training.shape))
+        print("Final test features output shape: {}".format(X_test.shape))
+    
+        y_training = np.empty(training_count * batch_size)
+        y_test = np.empty(test_count * batch_size)
+        print("Final training classes output shape: {}".format(y_training.shape))
+        print("Final test classes output shape: {}".format(y_test.shape))
 
-                y_test = current_batch[1] if y_test is None else np.concatenate((
-                    y_test,
-                    current_batch[1]),
-                    axis=0)
+        # Insantiate fresh generators
 
-        except Exception as e:
-            logging.error(e)
+        training_sample_generator = PatientSampleGenerator(
+            training_partition,
+            benign_top_level_path,
+            malignant_top_level_path,
+            manifest,
+            target_shape = target_shape,
+            batch_size = batch_size,
+            image_type = image_type,
+            image_data_generator = image_data_generator,
+            timestamp = timestamp,
+            kill_on_last_patient = True,
+            auto_resize_to_manifest_scale_max=False)
+
+        test_sample_generator = PatientSampleGenerator(
+            test_partition,
+            benign_top_level_path,
+            malignant_top_level_path,
+            manifest,
+            target_shape = target_shape,
+            batch_size = batch_size,
+            image_type = image_type,
+            image_data_generator = image_data_generator,
+            timestamp = timestamp,
+            kill_on_last_patient = True,
+            auto_resize_to_manifest_scale_max=False)
+        
+        training_gen = next(training_sample_generator)
+        test_gen = next(test_sample_generator)
+
+        # Extract training features
+
+        for bx in tqdm(range(training_count), desc="Training"):
+            current_batch = next(training_gen)
+            current_features = np.squeeze(model.predict(current_batch[0]))
+            current_classes = current_batch[1]
+
+            X_training[batch_size*bx:batch_size*(bx+1), :] = current_features
+            y_training[batch_size*bx:batch_size*(bx+1)] = current_classes
+
+        # Extract test features
+        
+        for bx in tqdm(range(test_count), desc="Test"):
+            current_batch = next(test_gen)
+            current_features = np.squeeze(model.predict(current_batch[0]))
+            current_classes = current_batch[1]
+
+            X_test[batch_size*bx:batch_size*(bx+1), :] = current_features
+            y_test[batch_size*bx:batch_size*(bx+1)] = current_classes
 
         output_hash = uuid.uuid4()
 
+        if override_filename_prefix is not None:
+            output_filename = "{}/{}.npy".format(output_directory_path, override_filename_prefix)
+        else:
+            output_filename = "{}/features_{}_{}.npy".format(output_directory_path, timestamp, output_hash)
+
         # TODO: Should probably add a hash to the output of this function
-        with open("{}/features_{}_{}.npy".format(output_directory_path, timestamp, output_hash), "wb") as f:
+        with open(output_filename, "wb") as f:
             data = {
                 "test_features": X_test, 
                 "test_labels": y_test,
@@ -235,14 +292,14 @@ if __name__ == '__main__':
 
     parser.add_argument("-it",
                         "--image_type",
-                        type = IMAGE_TYPE,
-                        default = IMAGE_TYPE.ALL,
+                        type = str,
+                        default = "ALL",
                         help = "Image class to consider in manifest")
 
     parser.add_argument("-ts",
                         "--target_shape",
                         type = list,
-                        default = [INCEPTION_RESNET_V2_HEIGHT, INCEPTION_RESNET_V2_WIDTH],
+                        default = [RESNET_50_HEIGHT, RESNET_50_WIDTH],
                         help = "Size to use for image samples of taken frames. Used to pad frames that are smaller the target shape, and crop-sample images that are larger than the target shape")
 
     parser.add_argument('-T', '--timestamp',
@@ -250,104 +307,38 @@ if __name__ == '__main__':
                         default = None,
                         help = "String timestamp to use as prefix to focus directory and manifest directory")
 
+    parser.add_argument('-ofp', '--override_filename_prefix',
+                        type = str,
+                        default = None,
+                        help = "String to use as filename for extracted features and logfile. Prefix only - do not include extension.")
+
     args = parser.parse_args()
 
     try:
-    
-        logging.basicConfig(level = logging.INFO, filename = "{}/{}_{}.log".format(
-            args.output_directory_path,
-            args.timestamp,
-            uuid.uuid4()
-        ))
+        if args.override_filename_prefix is not None:
+            logging_filename = "{}/{}.log".format(
+                args.output_directory_path, 
+                args.override_filename_prefix)
+        else:
+            logging_filename = "{}/extraction_{}_{}.log".format(
+                args.output_directory_path,
+                args.timestamp,
+                uuid.uuid4())
 
-        code = extract_save_patient_features(
+        logging.basicConfig(level = logging.INFO, filename = logging_filename)
+
+        exit_code = extract_save_patient_features(
             args.benign_top_level_path,
             args.malignant_top_level_path,
             args.manifest_path,
             args.output_directory_path,
             batch_size = args.batch_size,
             image_data_generator = args.image_data_generator,
-            image_type = args.image_type,
+            image_type = IMAGE_TYPE[args.image_type],
             target_shape = args.target_shape,
-            timestamp = args.timestamp)
+            timestamp = args.timestamp,
+            override_filename_prefix = args.override_filename_prefix)
 
 
     except Exception as e:
         raise(e)
-
-    # Load the manifest
-
-
-    # Save all feature, labels files to directory here. 
-
-
-
-
-
-
-
-
-
-    # SHOULD PROBABLY JUST BE USING THE MODEL TO PRODUCE FEATURES AS FEED-IN TO 
-    # LINEAR SVM CONSIDERING THE DATA IS SMALL AND EXTREMELY DIFFERENT FROM TRAINING
-
-    # Instantiate the resNet50 model
-    # base_model = ResNet50(
-    #     include_top=False,
-    #     input_shape=(197, 197, 3),
-    #     weights='imagenet',
-    #     pooling='avg')
-
-    # model = Model(
-    #     input=base_model.input,
-    #     output=base_model.get_layer('global_average_pooling2d_1').output)
-
-
-    # # Output dimensionality is (batch_size, 2048)
-    # feature_columns = list(map(lambda x: tf.feature_column.numeric_column(
-    #     key="resNet_{}".format(str(x)),
-    #     dtype=tf.float64,
-    #     shape=NUMBER_SAMPLES_PER_BATCH),
-    #     range(2048)))
-
-    # print(feature_columns[:3])
-
-    # # Estimator using the default optimizer.
-
-
-    # predictions = model.predict_generator(
-    #     next(training_sample_generator), 
-    #     steps=1, 
-    #     max_queue_size=10, 
-    #     workers=1, 
-    #     use_multiprocessing=False, 
-    #     verbose=2)
-
-
-
-
-
-
-    ############# OLD Code trying to retrain resNet50 - kind of silly 
-
-
-    # model.summary()
-
-
-    # # With a categorical crossentropy loss function, the network outputs must be categorical 
-    # model.compile(loss=categorical_crossentropy,
-    #             optimizer=Adam(),
-    #             metrics=['accuracy'])
-
-
-    # model.fit_generator(
-    #     next(training_sample_generator), 
-    #     steps_per_epoch=1, 
-    #     validation_data=next(validation_sample_generator),
-    #     validation_steps=1,
-    #     epochs=5, 
-    #     verbose=2,
-    #     use_multiprocessing=True)
-
-    # gen = next(patient_sample_generator)
-    # print(next(gen)[0].shape)µ

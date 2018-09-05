@@ -114,7 +114,6 @@ class PatientSampleGenerator:
 
         self.__load_current_patient_frames_into_generator()
 
-
     def __load_current_patient_frames_into_generator(self):
         """Private method to update current patient information based on patient_index"""
 
