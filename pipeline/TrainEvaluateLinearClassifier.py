@@ -2,6 +2,7 @@ import traceback
 import argparse
 import numpy as np
 import tensorflow as tf
+from tqdm import tqdm
 from constants.exceptions.customExceptions import TrainEvaluateLinearClassifierException
 
 tf.logging.set_verbosity(tf.logging.INFO)
@@ -19,11 +20,13 @@ def train_evaluate_linear_classifier(path_to_numpy_data_file):
     with open(path_to_numpy_data_file, "rb") as f:
         data = np.load(f)
         data = data[()]
-           
+    
+    # TODO: Missing feature scaling
+
     # TODO: Convert this to a property of the bundled dataset
     number_features = data["training_features"].shape[1] # each row is a sample
     feature_names = ["res_{}".format(n) for n in range(number_features)]
-    feature_columns = [tf.feature_column.numeric_column(k) for k in feature_names]
+    feature_columns = [tf.feature_column.numeric_column(k) for k in tqdm(feature_names, desc="NP->TF")]
 
     estimator = tf.estimator.LinearClassifier(
         feature_columns=feature_columns,

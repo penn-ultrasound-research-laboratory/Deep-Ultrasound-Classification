@@ -525,7 +525,7 @@ if __name__ == "__main__":
 
     timestamp =  args.timestamp if args.timestamp is not None else datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
-    logging.basicConfig(level = logging.INFO, filename = "{}/log_{}.log".format(
+    logging.basicConfig(level = logging.INFO, filename = "{}/preprocess_{}.log".format(
         args.path_to_manifest_output_directory,
         timestamp
     ))

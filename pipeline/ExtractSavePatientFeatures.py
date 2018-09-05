@@ -43,7 +43,8 @@ def extract_save_patient_features(
     image_data_generator=None,
     image_type=IMAGE_TYPE.ALL,
     target_shape=[RESNET_50_HEIGHT, RESNET_50_WIDTH],
-    timestamp=None):
+    timestamp=None,
+    override_filename_prefix=None):
     """Builds and saves a Numpy dataset with Resnet extracted features
 
     Arguments:
@@ -236,8 +237,13 @@ def extract_save_patient_features(
 
         output_hash = uuid.uuid4()
 
+        if override_filename_prefix is not None:
+            output_filename = "{}/{}.npy".format(output_directory_path, override_filename_prefix)
+        else:
+            output_filename = "{}/features_{}_{}.npy".format(output_directory_path, timestamp, output_hash)
+
         # TODO: Should probably add a hash to the output of this function
-        with open("{}/features_{}_{}.npy".format(output_directory_path, timestamp, output_hash), "wb") as f:
+        with open(output_filename, "wb") as f:
             data = {
                 "test_features": X_test, 
                 "test_labels": y_test,
@@ -286,8 +292,8 @@ if __name__ == '__main__':
 
     parser.add_argument("-it",
                         "--image_type",
-                        type = IMAGE_TYPE,
-                        default = IMAGE_TYPE.ALL,
+                        type = str,
+                        default = "ALL",
                         help = "Image class to consider in manifest")
 
     parser.add_argument("-ts",
@@ -301,15 +307,25 @@ if __name__ == '__main__':
                         default = None,
                         help = "String timestamp to use as prefix to focus directory and manifest directory")
 
+    parser.add_argument('-ofp', '--override_filename_prefix',
+                        type = str,
+                        default = None,
+                        help = "String to use as filename for extracted features and logfile. Prefix only - do not include extension.")
+
     args = parser.parse_args()
 
     try:
-    
-        logging.basicConfig(level = logging.INFO, filename = "{}/{}_{}.log".format(
-            args.output_directory_path,
-            args.timestamp,
-            uuid.uuid4()
-        ))
+        if args.override_filename_prefix is not None:
+            logging_filename = "{}/{}.log".format(
+                args.output_directory_path, 
+                args.override_filename_prefix)
+        else:
+            logging_filename = "{}/extraction_{}_{}.log".format(
+                args.output_directory_path,
+                args.timestamp,
+                uuid.uuid4())
+
+        logging.basicConfig(level = logging.INFO, filename = logging_filename)
 
         exit_code = extract_save_patient_features(
             args.benign_top_level_path,
@@ -318,9 +334,10 @@ if __name__ == '__main__':
             args.output_directory_path,
             batch_size = args.batch_size,
             image_data_generator = args.image_data_generator,
-            image_type = args.image_type,
+            image_type = IMAGE_TYPE[args.image_type],
             target_shape = args.target_shape,
-            timestamp = args.timestamp)
+            timestamp = args.timestamp,
+            override_filename_prefix = args.override_filename_prefix)
 
 
     except Exception as e:
