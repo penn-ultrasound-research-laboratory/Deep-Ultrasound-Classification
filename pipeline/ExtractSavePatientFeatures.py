@@ -125,8 +125,7 @@ def extract_save_patient_features(
             image_type = image_type,
             image_data_generator = image_data_generator,
             timestamp = timestamp,
-            kill_on_last_patient = True,
-            auto_resize_to_manifest_scale_max=False)
+            kill_on_last_patient = True)
 
         test_sample_generator = PatientSampleGenerator(
             test_partition,
@@ -138,8 +137,7 @@ def extract_save_patient_features(
             image_type = image_type,
             image_data_generator = image_data_generator,
             timestamp = timestamp,
-            kill_on_last_patient = True,
-            auto_resize_to_manifest_scale_max=False)
+            kill_on_last_patient = True)
 
         # Count the number of training and test samples - unknown at runtime due to randomized partition and
         # OCR/segmentation errors in preprocessing
@@ -196,8 +194,7 @@ def extract_save_patient_features(
             image_type = image_type,
             image_data_generator = image_data_generator,
             timestamp = timestamp,
-            kill_on_last_patient = True,
-            auto_resize_to_manifest_scale_max=False)
+            kill_on_last_patient = True)
 
         test_sample_generator = PatientSampleGenerator(
             test_partition,
@@ -209,8 +206,7 @@ def extract_save_patient_features(
             image_type = image_type,
             image_data_generator = image_data_generator,
             timestamp = timestamp,
-            kill_on_last_patient = True,
-            auto_resize_to_manifest_scale_max=False)
+            kill_on_last_patient = True)
         
         training_gen = next(training_sample_generator)
         test_gen = next(test_sample_generator)

@@ -1,3 +1,9 @@
+import cv2
+import json
+import logging
+import os
+import uuid
+
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -20,54 +26,49 @@ from utilities.imageUtilities import image_random_sampling_batch
 from keras.preprocessing.image import ImageDataGenerator
 from keras.utils import to_categorical
 
-import cv2
-import json
-import logging
-import os
-import uuid
-
-logger = logging.getLogger('research')
+LOGGER = logging.getLogger('research')
 
 class PatientSampleGenerator:
     """Generator that returns batches of samples for training and evaluation
-    
-    Arguments:
-        patient_list: list of patients. Patient is tuple (patientId, TUMOR_TYPE)
-        benign_top_level_path: absolute path to benign directory
-        malignant_top_level_path: absolute path to malignant directory
-        manifest: dictionary parsed from JSON containing all information from image OCR, tumor types, etc
 
+    Arguments:
+        patient_list                         list of patients. Patient is tuple (patientId, TUMOR_TYPE)
+        benign_top_level_path                absolute path to benign directory
+        malignant_top_level_path             absolute path to malignant directory
+
+        manifest                             dictionary parsed from JSON containing all information from
+                                                image OCR, tumor types, etc
     Optional:
-        batch_size: number of images to output in a batch
-        image_data_generator: preprocessing generator to run on input images
-        image_type: type of image frames to process (IMAGE_TYPE Enum). i.e. grayscale or color
-        target_shape: array containing target shape to use for output samples
-        timestamp: optional timestamp string to append in focus directory path. i.e. "*/focus_timestamp/*
-        kill_on_last_patient: Cycle through all matching patients exactly once. Forces generator to act like single-shot iterator
-        use_categorical: Output class labels as one-hot categorical matrix instead of numerical label 
-        auto_resize_to_manifest_scale_max: use the maximum scale value in the manifest as a reference 
+        batch_size                           number of images to output in a batch
+        image_data_generator                 preprocessing generator to run on input images
+        image_type                           type of image frames to process (IMAGE_TYPE Enum). i.e. grayscale or color
+        target_shape                         array containing target shape to use for output samples
+        timestamp                            timestamp string to append in focus directory path
+
+        kill_on_last_patient                 Cycle through all matching patients exactly once. Forces generator to act                                      like single-shot iterator
+
+        use_categorical                      Output class labels one-hot categorical matrix instead of dense numerical
 
     Returns:
         Tuple containing numpy arrays ((batch_size, (target_shape)), [labels]) 
             where the labels array is length batch_size 
 
     Raises:
-        PatientSampleGeneratorException for any error generating sample batches
+        PatientSampleGeneratorException      for any error generating sample batches
     """
 
-    def __init__(self, 
-        patient_list, 
-        benign_top_level_path, 
-        malignant_top_level_path, 
-        manifest, 
-        batch_size=DEFAULT_BATCH_SIZE,
-        image_data_generator=None, 
-        image_type=IMAGE_TYPE.ALL,
-        target_shape=None,
-        timestamp=None,
-        kill_on_last_patient=False,
-        use_categorical=False,
-        auto_resize_to_manifest_scale_max=False):
+    def __init__(self,
+                 patient_list,
+                 benign_top_level_path,
+                 malignant_top_level_path,
+                 manifest,
+                 batch_size=DEFAULT_BATCH_SIZE,
+                 image_data_generator=None,
+                 image_type=IMAGE_TYPE.ALL,
+                 target_shape=None,
+                 timestamp=None,
+                 kill_on_last_patient=False,
+                 use_categorical=False):
         
         self.raw_patient_list = patient_list
         self.manifest = manifest
@@ -80,7 +81,6 @@ class PatientSampleGenerator:
         self.target_shape = target_shape
         self.kill_on_last_patient = kill_on_last_patient
         self.use_categorical = use_categorical
-        self.auto_resize_to_manifest_scale_max = auto_resize_to_manifest_scale_max
 
         # Find all the patientIds with at least one frame in the specified IMAGE_TYPE
         # Patient list is unfiltered if IMAGE_TYPE.ALL
@@ -91,23 +91,9 @@ class PatientSampleGenerator:
                 lambda patient: any([frame[IMAGE_TYPE_LABEL] == image_type.value for frame in manifest[patient]]), 
                 [patient[0] for patient in patient_list]))
 
-        if len(cleared_patients) == 0:
+        if not cleared_patients:
             raise PatientSampleGeneratorException(
                 "No patients found with focus in image type: {0}".format(self.image_type.value))
-
-
-        if auto_resize_to_manifest_scale_max:
-            manifest_scale_max = 0.0
-            for patient in cleared_patients:            
-                try:
-                    candidate_max = max([frame[SCALE_LABEL] for frame in manifest[patient]])
-                    if candidate_max > manifest_scale_max: 
-                        manifest_scale_max = candidate_max
-                except:
-                    pass
-
-            logging.info("Maximum scale for patient partition: {}".format(manifest_scale_max))
-            self.manifest_scale_max = manifest_scale_max
 
         self.cleared_patients = cleared_patients
         self.patient_index = self.frame_index = 0
@@ -130,11 +116,16 @@ class PatientSampleGenerator:
             self.patient_frames = [
                 frame for frame in all_patient_frames if frame[IMAGE_TYPE_LABEL] == self.image_type.value]
 
+        # Frames must contain an image focus
+        self.patient_frames = [frame for frame in self.patient_frames if FOCUS_HASH_LABEL in frame]
+
+
     def __move_to_next_generator_patient_frame_state(self, current_is_last_frame, current_is_last_patient):
         if not current_is_last_frame:
+            # Move to next frame for patient
             self.frame_index += 1
         elif current_is_last_patient:
-
+            # Last patient frame. Loop back to first patient or terminate
             if self.kill_on_last_patient:
                 raise StopIteration("Reached the last patient. Terminating PatientSampleGenerator.")
 
@@ -142,6 +133,7 @@ class PatientSampleGenerator:
             self.frame_index = 0
             self.__load_current_patient_frames_into_generator()
         else:
+            # Move to next patient
             self.patient_index += 1
             self.frame_index = 0
             self.__load_current_patient_frames_into_generator()
@@ -153,21 +145,12 @@ class PatientSampleGenerator:
             current_frame_color = self.patient_frames[self.frame_index][IMAGE_TYPE_LABEL]
             is_last_frame = self.frame_index == len(self.patient_frames) - 1
             is_last_patient = self.patient_index == len(self.cleared_patients) - 1
-
-            # Skip past frames that have no corresponding focus, most likely due to error in segmentation subroutine
-            
-            if FOCUS_HASH_LABEL not in self.patient_frames[self.frame_index]:
-                logging.info("No focus in record: {} | frame: {}".format(self.patient_id, self.patient_frames[self.frame_index][FRAME_LABEL]))
-                self.__move_to_next_generator_patient_frame_state(is_last_frame, is_last_patient)
-                continue
                 
             color_mode = (
                 cv2.IMREAD_COLOR if current_frame_color == IMAGE_TYPE.COLOR.value
                 else cv2.IMREAD_GRAYSCALE)
 
-            loaded_image = cv2.imread("{}".format(
-                self.patient_frames[self.frame_index][FOCUS_HASH_LABEL]),
-                color_mode)
+            loaded_image = cv2.imread("{}".format(self.patient_frames[self.frame_index][FOCUS_HASH_LABEL]), color_mode)
 
             # All images are processed as RGB
             # TODO: Verify that this makes sense with channel ordering. I thought OpenCV 
@@ -175,7 +158,6 @@ class PatientSampleGenerator:
 
             if current_frame_color == IMAGE_TYPE.GRAYSCALE.value:
                 loaded_image = cv2.cvtColor(loaded_image, cv2.COLOR_GRAY2RGB)
-
 
             if loaded_image is None or len(loaded_image.shape) < 2:
                 logging.info("Skipping due to corruption: {} | frame: {}".format(self.patient_id, self.patient_frames[self.frame_index][FOCUS_HASH_LABEL]))
@@ -185,26 +167,7 @@ class PatientSampleGenerator:
                 continue
 
             else:
-
-                if self.auto_resize_to_manifest_scale_max:
-                    try:
-                        frame_scale = self.patient_frames[self.frame_index][SCALE_LABEL]
-                        upscale_ratio = self.manifest_scale_max / frame_scale
-
-                        logging.debug("Upscale Ratio: {}".format(upscale_ratio))
-
-                        loaded_image = cv2.resize(
-                            loaded_image, 
-                            None, 
-                            fx=upscale_ratio, 
-                            fy=upscale_ratio, 
-                            interpolation=cv2.INTER_CUBIC)
-
-                    except:
-                        logger.error("Unable to auto-resize. Frame {} does not have scale label".format(
-                            self.patient_frames[self.frame_index][FOCUS_HASH_LABEL]
-                        ))
-
+                
                 raw_image_batch = image_random_sampling_batch(
                     loaded_image, 
                     target_shape=self.target_shape,
@@ -212,7 +175,7 @@ class PatientSampleGenerator:
                     batch_size=self.batch_size,
                     always_sample_center=True)
 
-                logger.info("Raw Image Batch shape: {}".format(raw_image_batch.shape))
+                LOGGER.info("Raw Image Batch shape: %s", raw_image_batch.shape)
 
                 # Convert the tumor string label to integer label
                 frame_label = tumor_integer_label(self.patient_frames[self.frame_index][TUMOR_TYPE_LABEL])
@@ -278,21 +241,20 @@ if __name__ == "__main__":
     # Limit to small subset of patients
 
     patient_sample_generator = next(PatientSampleGenerator([
-            ("01PER2043096", "BENIGN"),
-            ("79BOY3049163", "MALIGNANT"),
-            ("93KUD3041008", "MALIGNANT")],
-        os.path.join(dirname, "../../100_Cases/ComprehensiveMaBenign/Benign"),
-        os.path.join(
-            dirname, "../../100_Cases/ComprehensiveMaBenign/Malignant"),
-        manifest,
-        target_shape=[220, 220],
-        image_type=IMAGE_TYPE.ALL,
-        image_data_generator=image_data_generator,
-        timestamp="2018-08-25_18-52-25",
-        batch_size=BATCH_SIZE,
-        auto_resize_to_manifest_scale_max=False,
-        kill_on_last_patient=True
-    ))
+        ("01PER2043096", "BENIGN"),
+        ("79BOY3049163", "MALIGNANT"),
+        ("93KUD3041008", "MALIGNANT")],
+    os.path.join(dirname, "../../100_Cases/ComprehensiveMaBenign/Benign"),
+    os.path.join(
+        dirname, "../../100_Cases/ComprehensiveMaBenign/Malignant"),
+    manifest,
+    target_shape=[220, 220],
+    image_type=IMAGE_TYPE.ALL,
+    image_data_generator=image_data_generator,
+    timestamp="2018-08-25_18-52-25",
+    batch_size=BATCH_SIZE,
+    kill_on_last_patient=True
+))
 
     count = 0
     plot_rows = []
