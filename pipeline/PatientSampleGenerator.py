@@ -83,22 +83,33 @@ class PatientSampleGenerator:
         self.use_categorical = use_categorical
 
         # Find all the patientIds with at least one frame in the specified IMAGE_TYPE
-        # Patient list is unfiltered if IMAGE_TYPE.ALL
+        # Patient list is unfiltered if IMAGE_TYPE.
+        
         if image_type is IMAGE_TYPE.ALL:
             cleared_patients = [patient[0] for patient in patient_list]
         else:
             cleared_patients = list(filter(
-                lambda patient: any([frame[IMAGE_TYPE_LABEL] == image_type.value for frame in manifest[patient]]), 
+                lambda patient: any([self.__is_frame_clear(frame) for frame in manifest[patient]]), 
                 [patient[0] for patient in patient_list]))
 
         if not cleared_patients:
             raise PatientSampleGeneratorException(
                 "No patients found with focus in image type: {0}".format(self.image_type.value))
 
+        # Determine the total number of cleared frames 
+        # External functions may need to preallocate memory. Helpful to maintain count of frames.
+        total_num_cleared_frames = 0
+        for patient in cleared_patients:
+            total_num_cleared_frames += len([frame for frame in manifest[patient] if self.__is_frame_clear(frame)])
+        
+        self.total_num_cleared_frames = total_num_cleared_frames
         self.cleared_patients = cleared_patients
         self.patient_index = self.frame_index = 0
 
         self.__load_current_patient_frames_into_generator()
+
+    def __is_frame_clear(self, frame):
+        return frame[IMAGE_TYPE_LABEL] == self.image_type.value and FOCUS_HASH_LABEL in frame
 
     def __load_current_patient_frames_into_generator(self):
         """Private method to update current patient information based on patient_index"""

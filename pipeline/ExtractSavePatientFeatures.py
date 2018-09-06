@@ -138,92 +138,49 @@ def extract_save_patient_features(
             image_data_generator = image_data_generator,
             timestamp = timestamp,
             kill_on_last_patient = True)
-
-        # Count the number of training and test samples - unknown at runtime due to randomized partition and
-        # OCR/segmentation errors in preprocessing
-
-        training_count = 0
-        test_count = 0
-        try:
-            gen = next(training_sample_generator)
-            while True:
-                if training_count == 0:
-                    current_batch = next(gen)
-                    current_features = model.predict(current_batch[0])
-                    output_feature_shape = np.squeeze(current_features).shape
-
-                    print("Features shape determined to be: {}".format(current_features.shape))
-                    print("Compressed feature shape: {}".format(np.squeeze(current_features).shape))
-                    print("Sample classes shape: {}".format(current_batch[1].shape))
-                else:
-                    next(gen)
-                
-                training_count += 1
-        except:
-            logger.info("Training count number samples: {}".format(training_count))
-
-        try:
-            gen = next(test_sample_generator)
-            while True:
-                next(gen)
-                test_count += 1
-        except:
-            logger.info("Test count number samples: {}".format(test_count))
-
-        ## Preallocate output feature matrix
-
-        X_training = np.empty((batch_size * training_count, output_feature_shape[1]))
-        X_test = np.empty((batch_size * test_count, output_feature_shape[1]))
-        print("Final training features output shape: {}".format(X_training.shape))
-        print("Final test features output shape: {}".format(X_test.shape))
-    
-        y_training = np.empty(training_count * batch_size)
-        y_test = np.empty(test_count * batch_size)
-        print("Final training classes output shape: {}".format(y_training.shape))
-        print("Final test classes output shape: {}".format(y_test.shape))
-
-        # Insantiate fresh generators
-
-        training_sample_generator = PatientSampleGenerator(
-            training_partition,
-            benign_top_level_path,
-            malignant_top_level_path,
-            manifest,
-            target_shape = target_shape,
-            batch_size = batch_size,
-            image_type = image_type,
-            image_data_generator = image_data_generator,
-            timestamp = timestamp,
-            kill_on_last_patient = True)
-
-        test_sample_generator = PatientSampleGenerator(
-            test_partition,
-            benign_top_level_path,
-            malignant_top_level_path,
-            manifest,
-            target_shape = target_shape,
-            batch_size = batch_size,
-            image_type = image_type,
-            image_data_generator = image_data_generator,
-            timestamp = timestamp,
-            kill_on_last_patient = True)
+        
+        training_count = training_sample_generator.total_num_cleared_frames
+        test_count = test_sample_generator.total_num_cleared_frames
         
         training_gen = next(training_sample_generator)
         test_gen = next(test_sample_generator)
 
-        # Extract training features
+        # Set feature/label matrices in outer scope
+        X_training = X_test = y_training = y_test = None
+       
+        PREALLOCATE_FLAG = True
 
-        for bx in tqdm(range(training_count), desc="Training"):
+        # Extract training features
+        for bx in tqdm(range(training_count), desc="TRAINING Feature Extraction"):
             current_batch = next(training_gen)
             current_features = np.squeeze(model.predict(current_batch[0]))
             current_classes = current_batch[1]
+
+            if PREALLOCATE_FLAG:
+                print("Features shape determined to be: {}".format(current_features.shape))
+                print("Compressed feature shape: {}".format(np.squeeze(current_features).shape))
+                print("Sample classes shape: {}".format(current_batch[1].shape))
+
+                output_feature_shape = np.squeeze(current_features).shape
+
+                ## Preallocate output feature matrix
+                X_training = np.empty((batch_size * training_count, output_feature_shape[1]))
+                X_test = np.empty((batch_size * test_count, output_feature_shape[1]))
+                print("Final training features output shape: {}".format(X_training.shape))
+                print("Final test features output shape: {}".format(X_test.shape))
+            
+                y_training = np.empty(training_count * batch_size)
+                y_test = np.empty(test_count * batch_size)
+                print("Final training classes output shape: {}".format(y_training.shape))
+                print("Final test classes output shape: {}".format(y_test.shape))
+
+                PREALLOCATE_FLAG = False
 
             X_training[batch_size*bx:batch_size*(bx+1), :] = current_features
             y_training[batch_size*bx:batch_size*(bx+1)] = current_classes
 
         # Extract test features
-        
-        for bx in tqdm(range(test_count), desc="Test"):
+        for bx in tqdm(range(test_count), desc="TEST Feature Extraction"):
             current_batch = next(test_gen)
             current_features = np.squeeze(model.predict(current_batch[0]))
             current_classes = current_batch[1]
@@ -243,10 +200,12 @@ def extract_save_patient_features(
             data = {
                 "test_features": X_test, 
                 "test_labels": y_test,
+                "test_partition": test_partition,
+                "test_count": test_count,
                 "training_features": X_training,
                 "training_labels": y_training,
                 "training_partition": training_partition,
-                "test_partition": test_partition
+                "training_count": training_count
             }
             np.save(f, data)
             logging.info("Saved generated features to output directory. Output hash: {}".format(output_hash))
