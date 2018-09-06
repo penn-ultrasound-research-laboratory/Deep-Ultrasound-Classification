@@ -215,17 +215,16 @@ class PatientSampleGenerator:
 
             logging.info("Training on patient: {} | color: {} | frame: {}".format(self.patient_id, current_frame_color, self.patient_frames[self.frame_index][FOCUS_HASH_LABEL]))
 
-            self.__move_to_next_generator_patient_frame_state(is_last_frame, is_last_patient)
-
             if self.use_categorical:
                 yield (
                     raw_image_batch, 
-                    to_categorical(np.repeat(frame_label, self.batch_size), 
-                    num_classes=2))
+                    to_categorical(np.repeat(frame_label, self.batch_size), num_classes=2))
             else:
                 yield (
                     raw_image_batch, 
                     np.repeat(frame_label, self.batch_size))
+
+            self.__move_to_next_generator_patient_frame_state(is_last_frame, is_last_patient)
 
         return
 

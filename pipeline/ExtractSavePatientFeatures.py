@@ -144,6 +144,8 @@ def extract_save_patient_features(
         
         training_count = training_sample_generator.total_num_cleared_frames
         test_count = test_sample_generator.total_num_cleared_frames
+        print("Training Count: {}".format(training_count))
+        print("Test Count: {}".format(test_count))
         
         training_gen = next(training_sample_generator)
         test_gen = next(test_sample_generator)
