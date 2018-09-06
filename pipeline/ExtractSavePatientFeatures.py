@@ -45,21 +45,23 @@ def extract_save_patient_features(
     target_shape=[RESNET_50_HEIGHT, RESNET_50_WIDTH],
     timestamp=None,
     override_filename_prefix=None):
-    """Builds and saves a Numpy dataset with Resnet extracted features
+    """Builds and saves a Numpy dataset with neural network extracted features
 
     Arguments:
-        benign_top_level_path: absolute path to benign directory
-        malignant_top_level_path: absolute path to malignant directory
-        manifest_path: absolute path to JSON containing all information from image OCR, tumor types, etc
-        output_directory_path: absolute path to output directory
-        batch_size: (optional) number of samples to take from each input frame (default 16)
-        image_data_generator: (optional) preprocessing generator to run on input images
-        image_type: (optional) type of image frames to process (IMAGE_TYPE Enum). i.e. grayscale or color
-        target_shape: (optional) array containing target shape to use for output samples [rows, columns]. 
-            No channel dimension.
-        timestamp: (optional) optional timestamp string to append in focus directory path. 
-            i.e. ***/focus_{timestamp}/***
+        benign_top_level_path                absolute path to benign directory
+        malignant_top_level_path             absolute path to malignant directory
+        manifest_path                        absolute path to JSON manifest
+        output_directory_path                absolute path to output directory
 
+    Optional:
+        batch_size                           number of samples to take from each input frame (default 16)
+        image_data_generator                 preprocessing generator to run on input images
+        image_type                           type of image frames to process (IMAGE_TYPE Enum). i.e. grayscale or color
+        target_shape                         array containing target shape to use for output samples [rows, columns]. 
+                                                No channel dimension should be included.
+        
+        timestamp                            timestamp string to append in focus directory path. 
+                                                i.e. ***/focus_{timestamp}/***
     Returns:
         Integer status code. Zero indicates clean processing and write to file. 
         Non-zero indicates error in feature generation script. 
@@ -71,6 +73,7 @@ def extract_save_patient_features(
     try:
         
         # When include_top=True input shape must be 224,224
+        # TODO: This should be part of a generic configuration
         base_model = resnet50.ResNet50(
             include_top=True,
             classes=2,
