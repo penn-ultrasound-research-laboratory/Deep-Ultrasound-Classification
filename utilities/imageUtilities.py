@@ -8,15 +8,24 @@ from matplotlib import pyplot
 
 
 def determine_image_type(bgr_image):
+    """Determines image type (Grayscale/Color) of image
+
+    Arguments:
+        bgr_image                            Image loaded w/ BGR channels (IMREAD.COLOR)
+
+    Returns:
+        IMAGE_TYPE Enum object. Specifies either IMAGE_TYPE.GRAYSCALE of IMAGE_TYPE.COLOR
+
+    Note:
+        0.04 is an empirically determined constant. When we convert MOV -> MP4 --> PNG frames, 
+        there is a small probability that a grayscale frame has some color bleeding. That is, a tiny segment of the 
+        pixels will take on a grayish/brown tint. Empirically, this gave ~0.02-0.04 color percentage to the full image.
+        We were basically getting false attribution of GRAYSCALE images to the COLOR image type enum because the
+        threshold of 0.015 was too low. Increased to 0.04. Hopefully shouldn't create false attribution. 
+        The color scale bar in true COLOR scans all but guarantees a percentage greater than 10%. 
+    """
     b, g, r = cv2.split(bgr_image)
     equality_check = np.logical_and(np.logical_and(b == r, b == g), r == g)
-
-    # 0.03 is an empirically determined constant. When we convert MOV -> MP4 --> PNG frames, 
-    # there is a small probability that a grayscale frame has some color bleeding. That is, a tiny segment of the 
-    # pixels will take on a grayish/brown tint. Empirically, this gave ~0.02-0.03 color percentage to the full image.
-    # We were basically getting false attribution of GRAYSCALE images to the COLOR image type enum because the
-    # threshold of 0.015 was too low. Increased to 0.04. Hopefully shouldn't create false attribution. 
-    # The color scale bar in true COLOR scans all but guarantees a percentage greater than 10%. 
 
     if 1.0 - (np.count_nonzero(equality_check) / equality_check.size) < 0.04:
         return IMAGE_TYPE.GRAYSCALE
@@ -28,19 +37,24 @@ def center_crop(image, target_shape, origin=None):
     """Crop the center portion of a color image
 
     Arguments:
-        image: a color image encoded as colors_last (e.g. [224, 224, 3])
-        target_shape: 
-        origin: (optional) tuple containing origin (row_offset, column_offset)
+        image                                An image. Either single channel (grayscale) or multi-channel (color)
+        target_shape                         Target shape of the image section to crop
 
+    Optional:
+        origin                               Tuple containing hardcoded origin (row_offset, column_offset). The "origin"
+                                                is the upper-left corner of the cropped image relative to 
+                                                the top left at (0,0).
     Returns:
-        A cropped color image if both the width and height are
-        less than the actual width and height. Else, returns the original 
-        image without cropping.
+        A cropped color image if both the target width and target height are
+        less than the actual width and actual height. 
+        Else, returns the original image without cropping.
 
     https://stackoverflow.com/questions/39382412/crop-center-portion-of-a-numpy-image
     """
-    number_rows, number_cols = image.shape[:2]
-    height, width = target_shape[:2]
+    is_multi_channel = len(image.shape) == 3
+
+    number_rows, number_cols = image.shape[:2] if is_multi_channel else image.shape
+    height, width = target_shape[:2] if is_multi_channel else target_shape
 
     if width > number_cols or height > number_rows:
         return image
@@ -69,18 +83,20 @@ def image_random_sampling_batch(
     """Randomly sample an image to produce sample batch 
 
     Arguments:
-        image: image to sample in channels_last format
-        target_shape: (optional) np.array containing image shape. Must be square - e.g. [200, 200]
-        batch_size: (optional) number of sample to generate in image batch
-        use_min_dimension: (optional) boolean indicating to use the minimum shape dimension 
-            as the cropping dimension. Must be True if target_shape is None. Will override 
-            target_shape regardless of shape value.
-        upscale_to_target: (optional) Upscale the image so that image dimensions >= target_shape before sampling
-            target_shape must be defined to use upscale_to_target
-        upscale_method: (optional) Interpolation method to used. Default cv2.INTER_CUBIC
+        image                                Image to sample in channels_last format
 
     Optional:
+        target_shape                         np.array containing output shape of each image sample. Must be square.
+        batch_size                           Number of sample to generate in image batch
 
+        use_min_dimension                    Boolean indicating to use the minimum shape dimension as the cropping
+                                                 dimension. Must be True if target_shape is None. Will override 
+                                                 target_shape regardless of shape value.
+        
+        upscale_to_target                    Upscale the image so that image dimensions >= target_shape before sampling
+                                                target_shape must be defined to use upscale_to_target
+        
+        upscale_method                       Interpolation method to used. Default cv2.INTER_CUBIC
 
     Returns:
         4D array containing sampled images in axis=0. 
@@ -89,19 +105,23 @@ def image_random_sampling_batch(
         ValueError: the target_shape is greater than the actual image shape in at least one dimension
     """
     try:
+        
+        if target_shape is None:
+            if use_min_dimension is False:
+                raise ValueError("Use minimum dimension must be True with no target shape specified")
+            if upscale_to_target:
+                raise TypeError("If upscale_to_target is True, target_shape must be defined")
+        else:
+            if target_shape[0] != target_shape[1]:
+                raise ValueError("Target Shape must be a square. E.g. [200, 200]")
 
-        if target_shape is not None and target_shape[0] != target_shape[1]:
-            raise ValueError("Target Shape must be a square. E.g. [200, 200]")
-
-        if target_shape is None and use_min_dimension is False:
-            raise ValueError("Use minimum dimension must be True with no target shape specified")
-
-        if target_shape is None and upscale_to_target:
-            raise TypeError("If upscale_to_target is True, target_shape must be defined")
+            # TODO: should raise an error if upscale_to_target is False and the passed in image is smaller
+            # in any dimension than the target shape
 
         if upscale_to_target:
             minimum_dimension = np.min(image.shape[:2])
             # Increase upscale ratio marginally to 
+            # Assumption is to do a square upscale (fx=fy). The behavior of non-square interpolation is odd. 
             upscale_ratio = (target_shape[0] / minimum_dimension) * 1.02
             image = cv2.resize(
                 image, 
