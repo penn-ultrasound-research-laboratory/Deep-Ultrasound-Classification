@@ -45,7 +45,8 @@ class PatientSampleGenerator:
         target_shape                         array containing target shape to use for output samples
         timestamp                            timestamp string to append in focus directory path
 
-        kill_on_last_patient                 Cycle through all matching patients exactly once. Forces generator to act                                      like single-shot iterator
+        kill_on_last_patient                 Cycle through all matching patients exactly once. Forces generator to act                                      
+                                                like single-shot iterator
 
         use_categorical                      Output class labels one-hot categorical matrix instead of dense numerical
 
@@ -171,9 +172,11 @@ class PatientSampleGenerator:
                 loaded_image = cv2.cvtColor(loaded_image, cv2.COLOR_GRAY2RGB)
 
             if loaded_image is None or len(loaded_image.shape) < 2:
-                logging.info("Skipping due to corruption: {} | frame: {}".format(self.patient_id, self.patient_frames[self.frame_index][FOCUS_HASH_LABEL]))
+                LOGGER.info("Skipping due to corruption: %s | frame: %s",
+                    self.patient_id,
+                    self.patient_frames[self.frame_index][FOCUS_HASH_LABEL])
+
                 # Stored image is corrupted. Skip to next frame. 
-                
                 self.__move_to_next_generator_patient_frame_state(is_last_frame, is_last_patient)
                 continue
 
@@ -207,13 +210,18 @@ class PatientSampleGenerator:
                         batch_size=self.batch_size, 
                         shuffle=True)
 
-                    # Output of ImageDataGenerator assigned to raw_image_batch is now preprocessed. Values will be negative in range spanning zero if mean normalization is included as part of preprocessing functions. 
+                    # Output of ImageDataGenerator assigned to raw_image_batch is now preprocessed. Values will be 
+                    # negative in range spanning zero if mean normalization is included as part of preprocessing 
+                    # functions. 
 
                     raw_image_batch = next(gen)
 
-                    logging.debug("Used image data generator to transform input image to shape: {}".format(raw_image_batch.shape))
+                    LOGGER.debug("Used image data generator to transform input image to shape: {}".format(raw_image_batch.shape))
 
-            logging.info("Training on patient: {} | color: {} | frame: {}".format(self.patient_id, current_frame_color, self.patient_frames[self.frame_index][FOCUS_HASH_LABEL]))
+            LOGGER.info("Training on patient: %s | color: %s | frame: %s",
+                self.patient_id, 
+                current_frame_color, 
+                self.patient_frames[self.frame_index][FOCUS_HASH_LABEL])
 
             if self.use_categorical:
                 yield (
@@ -239,7 +247,9 @@ if __name__ == "__main__":
 
     logging.basicConfig(level = logging.INFO, filename = "./main_output.log")
 
-    # W/ aim of generating graphics for paper / email. Featurwise normalize according to mean or std. That should be used only in image preprocessing pipeline. Issue is that negative scaled values are meaningless when saving to file or displaying as negative values are truncated to zero. 
+    # W/ aim of generating graphics for paper / email. Featurwise normalize according to mean or std. 
+    # That should be used only in image preprocessing pipeline. Issue is that negative scaled values are 
+    # meaningless when saving to file or displaying as negative values are truncated to zero. 
 
     image_data_generator = ImageDataGenerator(
         horizontal_flip = True,
