@@ -45,32 +45,35 @@ def extract_save_patient_features(
     target_shape=[RESNET_50_HEIGHT, RESNET_50_WIDTH],
     timestamp=None,
     override_filename_prefix=None):
-    """Builds and saves a Numpy dataset with Resnet extracted features
+    """Builds and saves a Numpy dataset with neural network extracted features
 
     Arguments:
-        benign_top_level_path: absolute path to benign directory
-        malignant_top_level_path: absolute path to malignant directory
-        manifest_path: absolute path to JSON containing all information from image OCR, tumor types, etc
-        output_directory_path: absolute path to output directory
-        batch_size: (optional) number of samples to take from each input frame (default 16)
-        image_data_generator: (optional) preprocessing generator to run on input images
-        image_type: (optional) type of image frames to process (IMAGE_TYPE Enum). i.e. grayscale or color
-        target_shape: (optional) array containing target shape to use for output samples [rows, columns]. 
-            No channel dimension.
-        timestamp: (optional) optional timestamp string to append in focus directory path. 
-            i.e. ***/focus_{timestamp}/***
+        benign_top_level_path                absolute path to benign directory
+        malignant_top_level_path             absolute path to malignant directory
+        manifest_path                        absolute path to JSON manifest
+        output_directory_path                absolute path to output directory
 
+    Optional:
+        batch_size                           number of samples to take from each input frame (default 16)
+        image_data_generator                 preprocessing generator to run on input images
+        image_type                           type of image frames to process (IMAGE_TYPE Enum). i.e. grayscale or color
+        target_shape                         array containing target shape to use for output samples [rows, columns]. 
+                                                No channel dimension should be included.
+        
+        timestamp                            timestamp string to append in focus directory path. 
+                                                i.e. ***/focus_{timestamp}/***
     Returns:
         Integer status code. Zero indicates clean processing and write to file. 
         Non-zero indicates error in feature generation script. 
 
     Raises:
-        PatientSampleGeneratorException for any error generating sample batches
+        PatientSampleGeneratorException      for any error generating sample batches
     """
 
     try:
         
         # When include_top=True input shape must be 224,224
+        # TODO: This should be part of a generic configuration
         base_model = resnet50.ResNet50(
             include_top=True,
             classes=2,
@@ -125,8 +128,7 @@ def extract_save_patient_features(
             image_type = image_type,
             image_data_generator = image_data_generator,
             timestamp = timestamp,
-            kill_on_last_patient = True,
-            auto_resize_to_manifest_scale_max=False)
+            kill_on_last_patient = True)
 
         test_sample_generator = PatientSampleGenerator(
             test_partition,
@@ -138,96 +140,52 @@ def extract_save_patient_features(
             image_type = image_type,
             image_data_generator = image_data_generator,
             timestamp = timestamp,
-            kill_on_last_patient = True,
-            auto_resize_to_manifest_scale_max=False)
-
-        # Count the number of training and test samples - unknown at runtime due to randomized partition and
-        # OCR/segmentation errors in preprocessing
-
-        training_count = 0
-        test_count = 0
-        try:
-            gen = next(training_sample_generator)
-            while True:
-                if training_count == 0:
-                    current_batch = next(gen)
-                    current_features = model.predict(current_batch[0])
-                    output_feature_shape = np.squeeze(current_features).shape
-
-                    print("Features shape determined to be: {}".format(current_features.shape))
-                    print("Compressed feature shape: {}".format(np.squeeze(current_features).shape))
-                    print("Sample classes shape: {}".format(current_batch[1].shape))
-                else:
-                    next(gen)
-                
-                training_count += 1
-        except:
-            logger.info("Training count number samples: {}".format(training_count))
-
-        try:
-            gen = next(test_sample_generator)
-            while True:
-                next(gen)
-                test_count += 1
-        except:
-            logger.info("Test count number samples: {}".format(test_count))
-
-        ## Preallocate output feature matrix
-
-        X_training = np.empty((batch_size * training_count, output_feature_shape[1]))
-        X_test = np.empty((batch_size * test_count, output_feature_shape[1]))
-        print("Final training features output shape: {}".format(X_training.shape))
-        print("Final test features output shape: {}".format(X_test.shape))
-    
-        y_training = np.empty(training_count * batch_size)
-        y_test = np.empty(test_count * batch_size)
-        print("Final training classes output shape: {}".format(y_training.shape))
-        print("Final test classes output shape: {}".format(y_test.shape))
-
-        # Insantiate fresh generators
-
-        training_sample_generator = PatientSampleGenerator(
-            training_partition,
-            benign_top_level_path,
-            malignant_top_level_path,
-            manifest,
-            target_shape = target_shape,
-            batch_size = batch_size,
-            image_type = image_type,
-            image_data_generator = image_data_generator,
-            timestamp = timestamp,
-            kill_on_last_patient = True,
-            auto_resize_to_manifest_scale_max=False)
-
-        test_sample_generator = PatientSampleGenerator(
-            test_partition,
-            benign_top_level_path,
-            malignant_top_level_path,
-            manifest,
-            target_shape = target_shape,
-            batch_size = batch_size,
-            image_type = image_type,
-            image_data_generator = image_data_generator,
-            timestamp = timestamp,
-            kill_on_last_patient = True,
-            auto_resize_to_manifest_scale_max=False)
+            kill_on_last_patient = True)
+        
+        training_count = training_sample_generator.total_num_cleared_frames
+        test_count = test_sample_generator.total_num_cleared_frames
+        print("Training Count: {}".format(training_count))
+        print("Test Count: {}".format(test_count))
         
         training_gen = next(training_sample_generator)
         test_gen = next(test_sample_generator)
 
-        # Extract training features
+        # Set feature/label matrices in outer scope
+        X_training = X_test = y_training = y_test = None
+       
+        PREALLOCATE_FLAG = True
 
-        for bx in tqdm(range(training_count), desc="Training"):
+        # Extract training features
+        for bx in tqdm(range(training_count), desc="TRAINING Feature Extraction"):
             current_batch = next(training_gen)
             current_features = np.squeeze(model.predict(current_batch[0]))
             current_classes = current_batch[1]
+
+            if PREALLOCATE_FLAG:
+                print("Features shape determined to be: {}".format(current_features.shape))
+                print("Compressed feature shape: {}".format(np.squeeze(current_features).shape))
+                print("Sample classes shape: {}".format(current_batch[1].shape))
+
+                output_feature_shape = np.squeeze(current_features).shape
+
+                ## Preallocate output feature matrix
+                X_training = np.empty((batch_size * training_count, output_feature_shape[1]))
+                X_test = np.empty((batch_size * test_count, output_feature_shape[1]))
+                print("Final training features output shape: {}".format(X_training.shape))
+                print("Final test features output shape: {}".format(X_test.shape))
+            
+                y_training = np.empty(training_count * batch_size)
+                y_test = np.empty(test_count * batch_size)
+                print("Final training classes output shape: {}".format(y_training.shape))
+                print("Final test classes output shape: {}".format(y_test.shape))
+
+                PREALLOCATE_FLAG = False
 
             X_training[batch_size*bx:batch_size*(bx+1), :] = current_features
             y_training[batch_size*bx:batch_size*(bx+1)] = current_classes
 
         # Extract test features
-        
-        for bx in tqdm(range(test_count), desc="Test"):
+        for bx in tqdm(range(test_count), desc="TEST Feature Extraction"):
             current_batch = next(test_gen)
             current_features = np.squeeze(model.predict(current_batch[0]))
             current_classes = current_batch[1]
@@ -247,10 +205,12 @@ def extract_save_patient_features(
             data = {
                 "test_features": X_test, 
                 "test_labels": y_test,
+                "test_partition": test_partition,
+                "test_count": test_count,
                 "training_features": X_training,
                 "training_labels": y_training,
                 "training_partition": training_partition,
-                "test_partition": test_partition
+                "training_count": training_count
             }
             np.save(f, data)
             logging.info("Saved generated features to output directory. Output hash: {}".format(output_hash))

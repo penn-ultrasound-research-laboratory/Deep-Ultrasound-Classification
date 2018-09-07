@@ -1,12 +1,15 @@
-from constants.ultrasoundConstants import (
-    IMAGE_TYPE,
-    TUMOR_BENIGN,
-    TUMOR_MALIGNANT)
-from constants.modelConstants import TRAIN_TEST_VALIDATION_SPLIT
-from math import floor
-import numpy as np
 import os
 import argparse
+
+from math import floor
+
+from constants.modelConstants import TRAIN_TEST_VALIDATION_SPLIT
+from constants.ultrasoundConstants import (
+    TUMOR_BENIGN,
+    TUMOR_MALIGNANT)
+
+import numpy as np
+
 
 def train_test_split_indices(train_split_percentage, test_split_percentage, number_samples):
     """Return train/test/validate indices for a given number of samples
@@ -14,58 +17,60 @@ def train_test_split_indices(train_split_percentage, test_split_percentage, numb
     Given percentages to use for train/test/(validate) split, return indices that can be used to index
     into identifier arrays at a higher level.
 
-    Note: The sum of train and test does not need to equal 1.0. Any remaining percentage will be used for 
+    Note: The sum of train and test does not need to equal 1.0. Any remaining percentage will be used for
     validation indices
 
     Arguments:
-        train_split_percentage: The percentage to use for the train split (0 < x < 1.0)
-        test_split_percentage: The percentage to use for the test split (0 < x < 1.0)
-        number_samples: Integer number of samples to split
+        train_split_percentage               The percentage to use for the train split (0 < x < 1.0)
+        test_split_percentage                The percentage to use for the test split (0 < x < 1.0)
+        number_samples                       Integer number of samples to split
 
     Returns:
-        Length 3 tuple where each value is a list of indices: 
+        Length 3 tuple where each value is a list of indices:
         (
-            train_indices, 
-            test_indices, 
+            train_indices,
+            test_indices,
             validation_indices
         )
     """
 
     # Training indices
     train_indices = np.random.choice(
-        number_samples, 
-        floor(train_split_percentage * number_samples), 
-        replace = False).tolist()
+        number_samples,
+        floor(train_split_percentage * number_samples),
+        replace=False).tolist()
 
     # Non-training indices
     non_train_indices = [index for index in np.arange(number_samples) if index not in train_indices]
-    
+
     # Test indices
     test_indices = np.random.choice(
-        non_train_indices, 
-        floor(test_split_percentage * number_samples), 
-        replace = False).tolist()
+        non_train_indices,
+        floor(test_split_percentage * number_samples),
+        replace=False).tolist()
 
     # Validation indices (optional)
-    validation_indices = [index for index in np.arange(
-        number_samples) if index not in (train_indices + test_indices)]
+    validation_indices = [index for index in np.arange(number_samples) if index not in train_indices + test_indices]
 
     return (train_indices, test_indices, validation_indices)
 
-    
 
 def patient_train_test_validation_split(
         benign_top_level_path,
         malignant_top_level_path,
-        include_validation = False):
-    """Allocate patients to training, test, validation sets. 
+        include_validation=False):
+    """Allocate patients to training, test, validation sets.
 
-    The directory structure of the ultrasound data is split into Malignant and Benign folders at the top level. This function compiles lists of all the patients and randomly assigns them to training, test, or validation sets using the ratios specified in a constants file.  
+    The directory structure of the ultrasound data is split into Malignant and Benign folders at the top level. This
+    function compiles lists of all the patients and randomly assigns them to training, test, or validation sets using
+    the ratios specified in a constants file.
 
     Arguments:
-        benign_top_level_path: absolute path to benign top level folder
-        malignant_top_level_path: absolute path to malignant top level folder
-        ignore_validation: (optional) Only split the dataset into training/test. Test partition consumes validation.
+        benign_top_level_path                absolute path to benign top level folder
+        malignant_top_level_path             absolute path to malignant top level folder
+
+    Optional:
+        ignore_validation                    Only split the dataset into training/test. No validation partition.
 
     Returns:
         Dictionary containing arrays: benign_train, benign_test, benign_cval,
@@ -96,13 +101,13 @@ def patient_train_test_validation_split(
     if include_validation:
         patient_dataset["malignant_cval"] = [
             (malignant_patients[index], TUMOR_MALIGNANT) for index in validation_indices]
-    else: 
+    else:
         patient_dataset["malignant_test"] += [
             (malignant_patients[index], TUMOR_MALIGNANT) for index in validation_indices]
 
     # TODO: Code reusability here obviously poor. Split into generic helper method.
 
-    # Number of benign patients differs from number malignant. Generate correctly size index set. 
+    # Number of benign patients differs from number malignant. Generate correctly size index set.
     if num_benign != num_malignant:
 
         train_indices, test_indices, validation_indices = train_test_split_indices(
@@ -120,36 +125,36 @@ def patient_train_test_validation_split(
             (benign_patients[index], TUMOR_BENIGN) for index in validation_indices]
     else:
         patient_dataset["benign_test"] += [
-            (benign_patients[index], TUMOR_BENIGN) for index in validation_indices]        
+            (benign_patients[index], TUMOR_BENIGN) for index in validation_indices]
 
     return patient_dataset
 
 
 if __name__ == "__main__":
-    
-    parser = argparse.ArgumentParser()
 
-    parser.add_argument(
+    PARSER = argparse.ArgumentParser()
+
+    PARSER.add_argument(
         "benign_top_level_path",
         type=str,
         help="Path to benign top level directory")
 
-    parser.add_argument(
+    PARSER.add_argument(
         "malignant_top_level_path",
         type=str,
         help="Path to malignant top level directory")
 
-    args = parser.parse_args()
+    ARGS = PARSER.parse_args()
 
-    index_dictionary = patient_train_test_validation_split(
-        args.benign_top_level_path,
-        args.malignant_top_level_path,
-        include_validation = False)
+    INDEX_DICTIONARY = patient_train_test_validation_split(
+        ARGS.benign_top_level_path,
+        ARGS.malignant_top_level_path,
+        include_validation=False)
 
-    all_patients = set()
-    for key in index_dictionary.keys():
-        for patient in index_dictionary[key]:
-            all_patients.add(patient[0])
+    ALL_PATIENTS = set()
+    for key in INDEX_DICTIONARY.keys():
+        for patient in INDEX_DICTIONARY[key]:
+            ALL_PATIENTS.add(patient[0])
 
     # Set size should be the length of all patients (each patient used exactly once)
-    print(len(all_patients))
+    print(len(ALL_PATIENTS))
