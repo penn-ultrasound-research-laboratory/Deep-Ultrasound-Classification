@@ -7,17 +7,53 @@ from constants.exceptions.customExceptions import TrainEvaluateLinearClassifierE
 
 tf.logging.set_verbosity(tf.logging.INFO)
 
-def get_input_fn(feature_ndarray, labels, num_epochs=None, shuffle=True):
+def get_input_fn(feature_ndarray, labels, num_epochs=None, shuffle=True, feature_basename="res"):
+    """Returns a tensorflow numpy input function
+
+    Arguments:
+        feature_ndarray                      feature matrix
+        labels                               labels array
+
+    Optional:
+        num_epochs                           number of epochs to run over the data
+        shuffle                              Boolean indicating whether to shuffle the queue
+        feature_basename                     String to use as basename for generated features (e.g. res_1,...,res_i)
+
+    Returns:
+        A tensorflow input function that feeds dict of numpy arrays into model
+    """
     number_features = feature_ndarray.shape[1] # each row is a sample
     return tf.estimator.inputs.numpy_input_fn(
-        x={ "res_{}".format(n):feature_ndarray[:, n] for n in range(number_features)},
+        x={ "{}_{}".format(feature_basename, n): feature_ndarray[:, n] for n in range(number_features)},
         y=labels,
         num_epochs=num_epochs,
         shuffle=shuffle)
 
-def train_evaluate_linear_classifier(path_to_numpy_data_file):
 
-    with open(path_to_numpy_data_file, "rb") as f:
+
+def train_evaluate_linear_classifier(abs_path_to_np_data):
+    """Trains and evaluates a classifier on a passed in set of features and labels
+
+    Numpy data file structure:
+
+    {
+        training_features:                   np.array[samples, features]
+        training_labels:                     [1, samples]
+        validation_features:                 [samples, features]
+        validation_labels:                   [1, samples]
+        test_features:                       [samples, features]
+        test_labels:                         [1, samples]
+    }   
+
+    Arguments:
+        abs_path_to_np_data                  absolute path to numpy data file
+
+    Returns:
+        Nothing
+        TODO: dump evaluation summary to file? ROC plots, precision/recall, confusion matrix
+
+    """
+    with open(abs_path_to_np_data, "rb") as f:
         data = np.load(f)
         data = data[()]
     
@@ -52,21 +88,8 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
 
-
-    """
-    Expected numpy data input format:
-    {
-        training_features: np.array[samples, features]
-        training_labels: [1, samples]
-        validation_features: [samples, features]
-        validation_labels: [1, samples]
-        test_features: [samples, features]
-        test_labels: [1, samples]
-    }
-    """
-
     parser.add_argument(
-        "path_to_numpy_data_file",
+        "abs_path_to_np_data",
         type=str,
         help="Absolute path to numpy data file. Data format is dictionary")
 
@@ -74,7 +97,7 @@ if __name__ == "__main__":
 
     try:
         train_evaluate_linear_classifier(
-            args["path_to_numpy_data_file"])
+            args["abs_path_to_np_data"])
     
     except TrainEvaluateLinearClassifierException as e:
         traceback.print_exc()
