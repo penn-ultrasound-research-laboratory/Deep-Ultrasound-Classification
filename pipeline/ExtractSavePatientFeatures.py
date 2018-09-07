@@ -67,7 +67,7 @@ def extract_save_patient_features(
         Non-zero indicates error in feature generation script. 
 
     Raises:
-        PatientSampleGeneratorException for any error generating sample batches
+        PatientSampleGeneratorException      for any error generating sample batches
     """
 
     try:
