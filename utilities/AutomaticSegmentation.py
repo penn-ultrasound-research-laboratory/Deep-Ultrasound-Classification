@@ -40,7 +40,7 @@ def __linear_normalization(image):
     ])
 
 def __enhance_hypoechoic_regions(image):
-    SN = skew(image.flatten()) # image.flatten()
+    SN = skew(image.flatten()) 
     z_a = 20
     z_c = np.mean(image)
     
@@ -49,28 +49,24 @@ def __enhance_hypoechoic_regions(image):
     else:
         z_b = (z_a + z_c * (1-SN)) / 2
 
-    print("z_a: {} | z_b: {} | z_c: {}".format(z_a, z_b, z_c))
+    print("z_a: {} | z_b: {} | z_c: {} | SN: {}".format(z_a, z_b, z_c, SN))
 
-    # if z_a <= z_b:
-    #     vfunc = np.vectorize()
-    #     return vfunc(image)
-
-    return np.piecewise(image, [
+    return np.piecewise(image.astype(float), [
         image <= z_a,
-        (image > z_a)&(z_a <= z_b),
-        (image <= z_c)&(image >= z_b)
+        (image > z_a)&(image <= z_b),
+        (image <= z_c)&(image > z_b)
     ], [
-        1.0,
-        lambda p: 1 - ((p - z_a)**2 / ((z_c - z_a) * (z_b - z_a))),
+        1,
+        lambda p: 1.0 - ((p - z_a)**2 / ((z_c - z_a) * (z_b - z_a))),
         lambda p: (p - z_c)**2 / ((z_c - z_a) * (z_c - z_b)),
-        0.0
+        0
     ])
     
 def __get_reference_point(image, max_iters=100, eps=2):
 
-    # plt.imshow(image)
-    # plt.colorbar()
-    # plt.show()
+    plt.imshow(image)
+    plt.colorbar()
+    plt.show()
 
     # Watch out that this doesn't blow up if max_iters >>> 
     weight_dot_image_mat = np.empty((max_iters,) + image.shape)
@@ -90,7 +86,7 @@ def __get_reference_point(image, max_iters=100, eps=2):
     print("Initial Center: ({}, {})".format(C[0, 0], C[0, 1]))
 
     # THESE MIGHT BE THE WRONG INITIAL VALUES
-    WB[0] = np.array([1, 1, 1 ,1])
+    WB[0] = np.array([0.0, 0.0, 0.0 ,0.0])
 
     print("C shape: {}".format(C.shape))
     print("weight_dot_image_mat shape: {}".format(weight_dot_image_mat.shape))
@@ -103,12 +99,22 @@ def __get_reference_point(image, max_iters=100, eps=2):
         w_multi_prod = np.prod(weight_dot_image_mat[:it], axis=0)
         print("w_multi_prod shape: {}".format(w_multi_prod.shape))
 
+        plt.imshow(w_multi_prod)
+        plt.colorbar()
+        plt.show()
+
+
         # Normalization constant
         nc = np.sum(w_multi_prod.flatten())
         print("nc: {}".format(nc))
         
-        C_i_c = np.sum(np.prod(np.multiply(w_multi_prod, col_ind), axis=0).flatten()  / nc) 
-        C_i_r = np.sum(np.prod(np.multiply(w_multi_prod, row_ind), axis=0).flatten() / nc) 
+        # This may be correct
+        C_i_c = np.sum(np.sum(np.multiply(col_ind, w_multi_prod).flatten() / nc))
+        C_i_r = np.sum(np.sum(np.multiply(row_ind, w_multi_prod).flatten() / nc))
+
+        # THIS IS WRONG!!! 
+        # C_i_c = np.sum(np.prod(np.multiply(w_multi_prod, col_ind), axis=0).flatten()  / nc) 
+        # C_i_r = np.sum(np.prod(np.multiply(w_multi_prod, row_ind), axis=0).flatten() / nc) 
 
         print("C: ({}, {})".format(C_i_r, C_i_c))
 
@@ -117,8 +123,9 @@ def __get_reference_point(image, max_iters=100, eps=2):
         if np.linalg.norm(C[it] - C[it-1]) < eps:
             print("Center change less than epsilon")
             return C[it]
-        
-        # Update bounds
+
+        ## Update bounds
+        # Update columns
         if C[it][1] - C[it-1][1] > 0:
             WB[it, 0] = C[it][1] - C[it-1][1]
             WB[it, 1] = WB[it-1, 1]
@@ -126,14 +133,17 @@ def __get_reference_point(image, max_iters=100, eps=2):
             WB[it, 0] = WB[it-1, 0]
             WB[it, 1] = C[it-1][1] - C[it][1]
 
-
         if C[it][0] - C[it-1][0] > 0:
             WB[it, 2] = C[it][0] - C[it-1][0]
             WB[it, 3] =  WB[it-1, 3]
         else: 
             WB[it, 2] = WB[it-1, 2]
             WB[it, 3] = C[it-1][0] - C[it][0]
-        
+
+        # BOUNDS ARE POSSIBLY GOING TO WORK
+        print("New bounds: {}".format(WB[it]))
+
+        # I THINK THIS IS WRONG!!!!  
         # Update weighting function
         row_weight_update = np.piecewise(row_ind, [
             (row_ind < WB[it, 2])|(row_ind > M - WB[it, 3]) 
@@ -165,7 +175,7 @@ def get_ROI(image):
 
 if __name__ == "__main__":
 
-    elephant = cv2.imread("bu_crop.jpg", cv2.IMREAD_GRAYSCALE)
+    elephant = cv2.imread("../TestImages/CroppedImage.png", cv2.IMREAD_GRAYSCALE)
 
     get_ROI(elephant)
 
