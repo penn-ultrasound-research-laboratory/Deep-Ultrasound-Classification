@@ -149,14 +149,14 @@ def __get_reference_point(image, max_iters=100, eps=2):
             (row_ind < WB[it, 2])|(row_ind > M - WB[it, 3]) 
         ], [
             0.0,
-            lambda y: ((y - WB[2])*(M - WB[3] - y)) / ((M - WB[2] - WB[3]) / 2)**2
+            lambda y: ((y - WB[it, 2])*(M - WB[it, 3] - y)) / ((M - WB[it, 2] - WB[it, 3]) / 2)**2
         ])
 
         col_weight_update = np.piecewise(col_ind, [
             (col_ind < WB[it, 0])|(row_ind > N - WB[it, 1]) 
         ], [
             0.0,
-            lambda x: ((x - WB[0])*(N - WB[1] - x)) / ((N - WB[0] - WB[1]) / 2)**2
+            lambda x: ((x - WB[it, 0])*(N - WB[it, 1] - x)) / ((N - WB[it, 0] - WB[it, 1]) / 2)**2
         ])
 
         weight_dot_image_mat[it] = np.multiply(image, np.multiply(row_weight_update, col_weight_update))
