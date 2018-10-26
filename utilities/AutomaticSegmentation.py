@@ -10,6 +10,18 @@ import matplotlib.pyplot as plt
 from constants.ultrasoundConstants import IMAGE_TYPE
 from scipy.stats import skew
 
+def __seed_point_in_rectangle(seed_pt, rect):
+    x,y,w,h = rect
+    return (
+        seed_pt[1] > x and 
+        seed_pt[1] < x + w and
+        seed_pt[0] > y and 
+        seed_pt[0] < y + h
+    )
+
+def __rectangle_area(rect):
+    return rect[2] * rect[3]
+
 def __gaussian_filter(image):
     GAUSSIAN_KERNEL_SIZE_PAPER = 301
     CUTOFF_FREQ_PAPER = 30
@@ -26,11 +38,8 @@ def __gaussian_filter(image):
 
     return blur
 
-
 def __linear_normalization(image):
     lbound05, ubound95 = np.percentile(image, (5, 95))
-    print("5th Percentile: {}".format(lbound05))
-    print("95th Percentile: {}".format(ubound95))
 
     return np.piecewise(image, [
         image <= lbound05, 
@@ -51,8 +60,6 @@ def __enhance_hypoechoic_regions(image):
     else:
         z_b = (z_a + z_c * (1-SN)) / 2
 
-    print("z_a: {} | z_b: {} | z_c: {} | SN: {}".format(z_a, z_b, z_c, SN))
-
     return np.piecewise(image.astype(float), [
         image <= z_a,
         (image > z_a)&(image <= z_b),
@@ -66,10 +73,6 @@ def __enhance_hypoechoic_regions(image):
     
 def __get_reference_point(image, max_iters=100, eps=2):
 
-    plt.imshow(image)
-    plt.colorbar()
-    plt.show()
-
     # Watch out that this doesn't blow up if max_iters >>> 
     weight_dot_image_mat = np.empty((max_iters,) + image.shape)
     
@@ -79,51 +82,31 @@ def __get_reference_point(image, max_iters=100, eps=2):
     WB = np.empty((max_iters, 4))
     
     M, N = image.shape
-    row_ind, col_ind = np.indices(image.shape)
-
+    ind = np.indices(image.shape)
+    row_ind = ind[0]
+    col_ind = ind[1]
+        
     weight_dot_image_mat[0] = np.multiply(np.ones(image.shape), image)
 
     C[0] = np.array([M // 2, N // 2])
 
-    print("Initial Center: ({}, {})".format(C[0, 0], C[0, 1]))
-
     # THESE MIGHT BE THE WRONG INITIAL VALUES
     WB[0] = np.array([0.0, 0.0, 0.0 ,0.0])
-
-    print("C shape: {}".format(C.shape))
-    print("weight_dot_image_mat shape: {}".format(weight_dot_image_mat.shape))
-    print("WB shape: {}".format(WB.shape))
-    print("M: {}".format(M))
-    print("N: {}".format(N))
 
     for it in range(1, max_iters):
         # compute C_i. Update C[i] <- C_i
         w_multi_prod = np.prod(weight_dot_image_mat[:it], axis=0)
-        print("w_multi_prod shape: {}".format(w_multi_prod.shape))
-
-        plt.imshow(w_multi_prod)
-        plt.colorbar()
-        plt.show()
-
 
         # Normalization constant
         nc = np.sum(w_multi_prod.flatten())
-        print("nc: {}".format(nc))
         
         # This may be correct
         C_i_c = np.sum(np.sum(np.multiply(col_ind, w_multi_prod).flatten() / nc))
         C_i_r = np.sum(np.sum(np.multiply(row_ind, w_multi_prod).flatten() / nc))
 
-        # THIS IS WRONG!!! 
-        # C_i_c = np.sum(np.prod(np.multiply(w_multi_prod, col_ind), axis=0).flatten()  / nc) 
-        # C_i_r = np.sum(np.prod(np.multiply(w_multi_prod, row_ind), axis=0).flatten() / nc) 
-
-        print("C: ({}, {})".format(C_i_r, C_i_c))
-
         C[it] = np.array([C_i_r, C_i_c])
 
         if np.linalg.norm(C[it] - C[it-1]) < eps:
-            print("Center change less than epsilon")
             return C[it]
 
         ## Update bounds
@@ -138,46 +121,31 @@ def __get_reference_point(image, max_iters=100, eps=2):
         if C[it][0] - C[it-1][0] > 0:
             WB[it, 2] = C[it][0] - C[it-1][0]
             WB[it, 3] =  WB[it-1, 3]
-        else: 
+        else:
             WB[it, 2] = WB[it-1, 2]
             WB[it, 3] = C[it-1][0] - C[it][0]
 
-        # BOUNDS ARE POSSIBLY GOING TO WORK
-        print("New bounds: {}".format(WB[it]))
-
-        # I THINK THIS IS WRONG!!!!  
         # Update weighting function
-        row_weight_update = np.piecewise(row_ind, [
-            (row_ind < WB[it, 2])|(row_ind > M - WB[it, 3]) 
+        row_weight_update = np.piecewise(row_ind.astype(float), [
+            (row_ind > M - WB[it, 3])|(row_ind < WB[it, 2]) 
         ], [
             0.0,
-            lambda y: ((y - WB[it, 2])*(M - WB[it, 3] - y)) / ((M - WB[it, 2] - WB[it, 3]) / 2)**2
+            lambda y: ((y - WB[it, 2])*(M - WB[it, 3] - y)) / (((M - WB[it, 3] - WB[it, 2]) / 2)**2)
         ])
 
-        col_weight_update = np.piecewise(col_ind, [
-            (col_ind < WB[it, 0])|(row_ind > N - WB[it, 1]) 
+        col_weight_update = np.piecewise(col_ind.astype(float), [
+            (col_ind > N - WB[it, 1])|(col_ind < WB[it, 0]) 
         ], [
             0.0,
-            lambda x: ((x - WB[it, 0])*(N - WB[it, 1] - x)) / ((N - WB[it, 0] - WB[it, 1]) / 2)**2
+            lambda x: ((x - WB[it, 0])*(N - WB[it, 1] - x)) / (((N - WB[it, 1] - WB[it, 0]) / 2)**2)
         ])
 
         weight_dot_image_mat[it] = np.multiply(image, np.multiply(row_weight_update, col_weight_update))
-        
+
     return C[max_iters]
-
-
-def get_ROI(image):
-    blur = __gaussian_filter(image)
-    normalized = __linear_normalization(blur)
-    enhanced = __enhance_hypoechoic_regions(normalized)
-    reference_point = __get_reference_point(enhanced)
-
-    return reference_point, enhanced
-
 
 def __unit_flat_kernel(p_diff):
     return 1.0 if p_diff <= 1.0 else 0.0
-
 
 def __get_seed_point(image, rp, nd=12, h=12, eps=2, max_iters=100):
     
@@ -217,40 +185,63 @@ def __get_seed_point(image, rp, nd=12, h=12, eps=2, max_iters=100):
         max_crit[d] = nc
         post_cands[d] = p
         
-    i = np.argmax(max_crit)
-    max_p = post_cands[i, :]
+    max_p = post_cands[np.argmax(max_crit), :]
     
     return max_p, post_cands
+
+def __determine_roi(image, seed_pt, ks=(2,2)):
+
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, ks)
+
+    img_renorm = (image * 255).astype(np.uint8)
+
+    I_rc = cv2.morphologyEx(
+        img_renorm, 
+        cv2.MORPH_CLOSE, 
+        kernel)
+       
+    otsu_thresh, img_morph = cv2.threshold(I_rc, 0,255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+    im2, contours, hierarchy = cv2.findContours(
+        img_morph,
+        cv2.RETR_TREE,
+        cv2.CHAIN_APPROX_SIMPLE)    
+
+    # Find all bounding rectangles of contours that contain the seed point
+    br = [cv2.boundingRect(c) for c in contours]
+    br = [r for r in br if __seed_point_in_rectangle(seed_pt, r)]
+
+    # Destructure the minimum bounding rectangle of the minimum area contour containing seed point           
+    x, y, w, h = min(br, key = __rectangle_area)
+    
+    M, N = image.shape
+    x_exp = N // 20
+    y_exp = M // 20
+
+    return (
+        max(x - x_exp, 0),
+        max(y - y_exp, 0),
+        min(x + w + x_exp, N),
+        min(y + h + y_exp, M)
+    )
+
+
+def get_ROI(image):
+    blur = __gaussian_filter(image)
+    normalized = __linear_normalization(blur)
+    enhanced = __enhance_hypoechoic_regions(normalized)
+    ref_pt = __get_reference_point(enhanced)
+    seed_pt, post_cands = __get_seed_point(enhanced, ref_pt)
+    x, y, w, h = __determine_roi(enhanced, seed_pt)
+    return image[y:y+h, x:x+w]
 
 
 if __name__ == "__main__":
 
-    n = len(os.listdir("TestImages/bank"))
-    c = 3
-    r = (n // 3) + 1
-
-    fig = plt.figure(figsize=(15, 15))
-
-    for i, f in enumerate(os.listdir("TestImages/bank")):
+    for i, f in enumerate(os.listdir("../TestImages/bank")):
         
-        img = cv2.imread("TestImages/bank/{}".format(f), cv2.IMREAD_GRAYSCALE)
-        rp, enh = get_ROI(img)
-        max_p, post_cands = __get_seed_point(enh, rp, nd=12, h=20, eps=1)
-        
-        fig.add_subplot(r, c, i+1)
-        
-        plt.imshow(img)
-        plt.scatter(x=rp[1], y=rp[0], s=40, c='r')
-    #     plt.scatter(x=post_cands[:,1], y=post_cands[:,0], s=20, c='g')
-        plt.scatter(x=max_p[1], y=max_p[0], s=40, c='b')
-        
-    plt.show()
-
-    # se = np.ones((16,16),np.uint8)
-    # I_ro = cv2.erode(img, kernel = se, iterations = 1)
-    # I_ro_c = cv2.bitwise_not(I_ro)
-
-    # I_rc = cv2.bitwise_and(I_ro_c, I_ro_c, mask = cv2.bitwise_not(cv2.dilate(I_ro, kernel = se, iterations = 1)))
-
-    # plt.imshow(I_rc)
-    # plt.colorbar()
+        img = cv2.imread("../TestImages/bank/{}".format(f), cv2.IMREAD_GRAYSCALE)
+        roi = get_ROI(img)
+               
+        cv2.imshow("ROI", roi)
+        cv2.waitKey(0)
