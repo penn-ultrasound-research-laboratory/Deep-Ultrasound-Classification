@@ -10,6 +10,18 @@ import matplotlib.pyplot as plt
 from constants.ultrasoundConstants import IMAGE_TYPE
 from scipy.stats import skew
 
+def __seed_point_in_rectangle(seed_pt, rect):
+    x,y,w,h = rect
+    return (
+        seed_pt[1] > x and 
+        seed_pt[1] < x + w and
+        seed_pt[0] > y and 
+        seed_pt[0] < y + h
+    )
+
+def __rectangle_area(rect):
+    return rect[2] * rect[3]
+
 def __gaussian_filter(image):
     GAUSSIAN_KERNEL_SIZE_PAPER = 301
     CUTOFF_FREQ_PAPER = 30
@@ -177,44 +189,59 @@ def __get_seed_point(image, rp, nd=12, h=12, eps=2, max_iters=100):
     
     return max_p, post_cands
 
+def __determine_roi(image, seed_pt, ks=(2,2)):
+
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, ks)
+
+    img_renorm = (image * 255).astype(np.uint8)
+
+    I_rc = cv2.morphologyEx(
+        img_renorm, 
+        cv2.MORPH_CLOSE, 
+        kernel)
+       
+    otsu_thresh, img_morph = cv2.threshold(I_rc, 0,255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+    im2, contours, hierarchy = cv2.findContours(
+        img_morph,
+        cv2.RETR_TREE,
+        cv2.CHAIN_APPROX_SIMPLE)    
+
+    # Find all bounding rectangles of contours that contain the seed point
+    br = [cv2.boundingRect(c) for c in contours]
+    br = [r for r in br if __seed_point_in_rectangle(seed_pt, r)]
+
+    # Destructure the minimum bounding rectangle of the minimum area contour containing seed point           
+    x, y, w, h = min(br, key = __rectangle_area)
+    
+    M, N = image.shape
+    x_exp = N // 20
+    y_exp = M // 20
+
+    return (
+        max(x - x_exp, 0),
+        max(y - y_exp, 0),
+        min(x + w + x_exp, N),
+        min(y + h + y_exp, M)
+    )
+
+
 def get_ROI(image):
     blur = __gaussian_filter(image)
     normalized = __linear_normalization(blur)
     enhanced = __enhance_hypoechoic_regions(normalized)
     ref_pt = __get_reference_point(enhanced)
     seed_pt, post_cands = __get_seed_point(enhanced, ref_pt)
-
-    return (seed_pt, ref_pt, enhanced)
+    x, y, w, h = __determine_roi(enhanced, seed_pt)
+    return image[y:y+h, x:x+w]
 
 
 if __name__ == "__main__":
 
-    n = len(os.listdir("TestImages/bank"))
-    c = 3
-    r = (n // 3) + 1
-
-    fig = plt.figure(figsize=(15, 15))
-
-    for i, f in enumerate(os.listdir("TestImages/bank")):
+    for i, f in enumerate(os.listdir("../TestImages/bank")):
         
-        img = cv2.imread("TestImages/bank/{}".format(f), cv2.IMREAD_GRAYSCALE)
-        rp, enh = get_ROI(img)
-        max_p, post_cands = __get_seed_point(enh, rp, nd=12, h=20, eps=1)
-        
-        fig.add_subplot(r, c, i+1)
-        
-        plt.imshow(img)
-        plt.scatter(x=rp[1], y=rp[0], s=40, c='r')
-    #     plt.scatter(x=post_cands[:,1], y=post_cands[:,0], s=20, c='g')
-        plt.scatter(x=max_p[1], y=max_p[0], s=40, c='b')
-        
-    plt.show()
-
-    # se = np.ones((16,16),np.uint8)
-    # I_ro = cv2.erode(img, kernel = se, iterations = 1)
-    # I_ro_c = cv2.bitwise_not(I_ro)
-
-    # I_rc = cv2.bitwise_and(I_ro_c, I_ro_c, mask = cv2.bitwise_not(cv2.dilate(I_ro, kernel = se, iterations = 1)))
-
-    # plt.imshow(I_rc)
-    # plt.colorbar()
+        img = cv2.imread("../TestImages/bank/{}".format(f), cv2.IMREAD_GRAYSCALE)
+        roi = get_ROI(img)
+               
+        cv2.imshow("ROI", roi)
+        cv2.waitKey(0)
