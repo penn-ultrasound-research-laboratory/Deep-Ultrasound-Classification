@@ -3,12 +3,17 @@ import cv2
 import json
 import os
 
+import matplotlib.pyplot as plt
 import numpy as np
 
+from utilities.AutomaticSegmentation import get_ROI_debug
+from constants.ultrasoundConstants import HSV_COLOR_THRESHOLD
 from constants.ultrasoundConstants import (
     IMAGE_TYPE,
     IMAGE_TYPE_LABEL,
     FRAME_LABEL)
+
+from utilities.focus.grayscaleImageFocus import get_scan_area, get_tumor_focus
 
 from pipeline.PatientSampleGenerator import PatientSampleGenerator
 
@@ -63,11 +68,46 @@ def __grayscale_region_of_interest_graphic(
         for (p, tag) in bpat_bar]
 
     # Display the randomly chosen frame
-    for p, f, t in (mpat_frames + bpat_frames):
+    for p, f, label in (mpat_frames + bpat_frames):
         print(f)
-        frame = cv2.imread(f, cv2.IMREAD_GRAYSCALE)
+        frame = cv2.imread(f, cv2.IMREAD_COLOR)
+        
+        x_s, y_s, w_s, h_s = get_scan_area(
+            frame,
+            np.array(HSV_COLOR_THRESHOLD.LOWER.value, np.uint8),
+            np.array(HSV_COLOR_THRESHOLD.UPPER.value, np.uint8))
+        
+        cv2.rectangle(
+            frame,
+            (x_s, y_s),
+            (x_s + w_s, y_s + h_s),
+            255,
+            2)
+
+        scan_frame = frame[y_s:y_s+h_s, x_s:x_s+w_s]
+        print(scan_frame.shape)
+
+        roi_rect, seed_pt = get_ROI_debug(scan_frame)
+        x_r, y_r, w_r, h_r = roi_rect
+
+        cv2.rectangle(
+            frame,
+            (x_r, y_r),
+            (x_r + w_r, y_r + h_r),
+            255,
+            2)
+        
+        # plt.figure()
+        # plt.scatter(x=seed_pt[1], y=seed_pt[0], s=40, c='r')
+        # plt.imshow(frame)
+        # plt.xticks([])
+        # plt.yticks([])
+
+
+
         cv2.imshow("frame", frame)
         cv2.waitKey(0)
+
 
 
 if __name__ == "__main__":

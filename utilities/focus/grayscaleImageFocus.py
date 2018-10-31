@@ -154,6 +154,42 @@ def get_grayscale_image_focus(
     HSV_upper_bound,
     interpolation_factor=None,
     interpolation_method=cv2.INTER_CUBIC):
+
+    # Get the region of the frame that is only the scan. Remove background at the margins
+    x, y, w, h = get_scan_area(image, HSV_lower_bound, HSV_upper_bound)
+
+    # Crop the image to the bounding rectangle
+
+    focus_image = image[y:y+h, x:x+w]
+
+    # The bounding box includes the border. Remove the border by masking on the same
+    # thresholds as the initial mask, then flip the mask and draw a bounding box.
+
+    """
+    try:
+        
+
+    cropped_image = focus_image[y+3:y+h-3, x+3:x+w-3]
+
+    # Interpolate (upscale/downscale) the found segment if an interpolation factor is passed
+    if interpolation_factor is not None:
+        cropped_image = cv2.resize(
+            cropped_image,
+            None,
+            fx=interpolation_factor,
+            fy=interpolation_factor,
+            interpolation=interpolation_method)
+
+    return cropped_image, max_rect
+
+
+def get_grayscale_image_focus(
+        path_to_image,
+        path_to_output_directory,
+        HSV_lower_bound,
+        HSV_upper_bound,
+        interpolation_factor=None,
+        interpolation_method=cv2.INTER_CUBIC):
     """
     Determines the "focus" of an ultrasound frame in Color/CPA. 
 
@@ -174,53 +210,28 @@ def get_grayscale_image_focus(
         IOError: in case of any errors with OpenCV or file operations 
 
     """
+
+    # Load the image and convert it to HSV from BGR
+    # Then, threshold the HSV image to get only target border color
+    bgr_image = cv2.imread(path_to_image, cv2.IMREAD_COLOR)
+
     try:
-        
-
-  
-        # The bounding box includes the border. Remove the border by masking on the same 
-        # thresholds as the initial mask, then flip the mask and draw a bounding box. 
-
-        focus_hsv = cv2.cvtColor(focus_image, cv2.COLOR_BGR2HSV)
-        mask = cv2.inRange(
-            focus_hsv, 
-            HSV_lower_bound, 
-            HSV_upper_bound)
-            
-        mask = cv2.bitwise_not(mask)
-
-        contours = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)[1]
-
-        if len(contours) == 0:
-            raise Exception("Unable to find any matching contours")
-
-        #find the biggest area
-        max_contour = max(contours, key = cv2.contourArea)
-
-        x, y, w, h = cv2.boundingRect(max_contour)
-
-        # Crop the image to the bounding rectangle
-        # As conservative measure crop inwards 3 pixels to guarantee no boundary
-
-        cropped_image = focus_image[y+3:y+h-3, x+3:x+w-3]
-
-        # Interpolate (upscale/downscale) the found segment if an interpolation factor is passed
-        if interpolation_factor is not None:
-            cropped_image = cv2.resize(
-                cropped_image, 
-                None, 
-                fx=interpolation_factor, 
-                fy=interpolation_factor, 
-                interpolation=interpolation_method)
-
-        output_path = "{0}/{1}.png".format(path_to_output_directory, uuid.uuid4())
-
-        cv2.imwrite(output_path, cropped_image)
-
-        return output_path
+        image_scan_only, bounding_rect = get_tumor_focus(
+            bgr_image,
+            HSV_lower_bound,
+            HSV_upper_bound,
+            interpolation_factor=interpolation_factor,
+            interpolation_method=interpolation_method)
 
     except Exception as exception:
         raise IOError("Error isolating and saving image focus")
+
+    output_path = "{0}/{1}.png".format(
+        path_to_output_directory, uuid.uuid4())
+
+    cv2.imwrite(output_path, image_scan_only)
+
+    return output_path
 
 
 
