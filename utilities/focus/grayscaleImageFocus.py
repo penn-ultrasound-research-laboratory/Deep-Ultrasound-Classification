@@ -1,4 +1,6 @@
-import argparse, uuid
+import argparse
+import uuid
+import os
 import cv2
 import numpy as np
 from constants.ultrasoundConstants import HSV_COLOR_THRESHOLD
@@ -55,30 +57,45 @@ def select_scan_window_from_frame(
         row_slice, column_slice = select_bounds
         image = image[row_slice, column_slice]
 
-    mask = cv2.inRange(
-        image, 
-        mask_lower_bound, 
-        mask_upper_bound)
+    N, M = image.shape
 
-    # Determine contours of the masked image
+    # Otsu thresholding on the image to remove background
+    mask = cv2.threshold(image, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
+
+    # Run morphological closing on the center 95% of the mask
+    div = 40   
+    y_s = N // div
+    x_s = M // div
+
+    mask = cv2.morphologyEx(
+        mask[slice(y_s, N - y_s), slice(x_s, M - x_s)], 
+        cv2.MORPH_CLOSE, 
+        np.ones((8,8),np.uint8))
+
+    if True:
+        mask = cv2.morphologyEx(
+        mask[:, slice(x_s, M - x_s)], 
+        cv2.MORPH_CLOSE, 
+        np.ones((8,8),np.uint8))
+
+    # Determine mask contours
     contours = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)[1]
 
     if len(contours) == 0:
         raise Exception("Unable to find any matching contours")
 
-    # Contour with maximum enclosed area corresponds to highlight rectangle
-    
-    max_contour = max(contours, key = cv2.contourArea)
-    x, y, w, h = cv2.boundingRect(max_contour)
+    # Contour with maximum enclosed area corresponds to scan window
+    scan_contour = max(contours, key = cv2.contourArea)
+    x, y, w, h = cv2.boundingRect(scan_contour)
 
-    # Crop the image to the bounding rectangle
-    focus_image = image[y:y+h, x:x+w]
+    # Return the scan window slice of the image
+    scan_window = image[y+y_s:y+h, x+x_s:x+w]
 
     if select_bounds is None:
-        return (focus_image, max_contour)
+        return (scan_window, scan_contour)
     else:
-        ret_contour = (x + column_slice.start, y + row_slice.start, w, h)
-        return (focus_image, ret_contour)
+        scan_contour = (x + column_slice.start + x_s, y + row_slice.start + y_s, w, h)
+        return (scan_window, scan_contour)
 
 
 def get_grayscale_image_focus(
@@ -170,22 +187,26 @@ if __name__ == "__main__":
         
     args = vars(ap.parse_args())
 
-    image = cv2.imread(args["image"], cv2.IMREAD_GRAYSCALE)
-    N, M = image.shape
+    path = args["image"]
 
-    scan_window, scan_bounds = select_scan_window_from_frame(
-        image, 
-        1, 255, 
-        select_bounds = (slice(70, N), slice(90, M)))
+    for filename in os.listdir(path):
+        
+        image = cv2.imread(path + "/" + filename, cv2.IMREAD_GRAYSCALE)
+        N, M = image.shape
 
-    x, y, w, h = scan_bounds
+        scan_window, scan_bounds = select_scan_window_from_frame(
+            image, 
+            5, 255, 
+            select_bounds = (slice(70, N), slice(90, M)))
 
-    cv2.rectangle(
-        image,
-        (x, y),
-        (x + w, y + h),
-        210,
-        2)
+        x, y, w, h = scan_bounds
 
-    cv2.imshow("image", image)
-    cv2.waitKey(0)
+        cv2.rectangle(
+            image,
+            (x, y),
+            (x + w, y + h),
+            245,
+            2)
+
+        cv2.imshow("image", image)
+        cv2.waitKey(0)
