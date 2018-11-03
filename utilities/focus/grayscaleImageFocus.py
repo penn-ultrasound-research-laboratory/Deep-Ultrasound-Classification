@@ -77,7 +77,7 @@ def select_scan_window_from_frame(
     if select_bounds is None:
         return (focus_image, max_contour)
     else:
-        ret_contour = (x + column_slice.stop, y + row_slice.stop, w, h)
+        ret_contour = (x + column_slice.start, y + row_slice.start, w, h)
         return (focus_image, ret_contour)
 
 
@@ -178,7 +178,14 @@ if __name__ == "__main__":
         1, 255, 
         select_bounds = (slice(70, N), slice(90, M)))
 
-    cv2.imshow("window", image)
+    x, y, w, h = scan_bounds
 
-    cv2.draw
+    cv2.rectangle(
+        image,
+        (x, y),
+        (x + w, y + h),
+        210,
+        2)
+
+    cv2.imshow("image", image)
     cv2.waitKey(0)
