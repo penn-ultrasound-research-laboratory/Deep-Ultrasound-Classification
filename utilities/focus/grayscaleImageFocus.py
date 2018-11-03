@@ -55,6 +55,8 @@ def select_scan_window_from_frame(
 
     if select_bounds is not None:
         row_slice, column_slice = select_bounds
+        css = column_slice.start
+        rss = row_slice.start
         image = image[row_slice, column_slice]
 
     N, M = image.shape
@@ -63,19 +65,19 @@ def select_scan_window_from_frame(
     mask = cv2.threshold(image, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
 
     # Run morphological closing on the center 95% of the mask
-    div = 40   
+    div = 20   
     y_s = N // div
     x_s = M // div
 
-    mask = cv2.morphologyEx(
-        mask[slice(y_s, N - y_s), slice(x_s, M - x_s)], 
-        cv2.MORPH_CLOSE, 
-        np.ones((8,8),np.uint8))
+    # mask[slice(y_s, N - y_s), slice(x_s, M - x_s)] = cv2.morphologyEx(
+    #     mask[slice(y_s, N - y_s), slice(x_s, M - x_s)], 
+    #     cv2.MORPH_CLOSE, 
+    #     np.ones((8,8),np.uint8))
 
-    if True:
-        mask = cv2.morphologyEx(
-        mask[:, slice(x_s, M - x_s)], 
-        cv2.MORPH_CLOSE, 
+    center_region = mask[slice(y_s, N - y_s), slice(x_s, M - x_s)] 
+    
+    center_region[:] = cv2.dilate(
+        center_region, 
         np.ones((8,8),np.uint8))
 
     # Determine mask contours
@@ -88,13 +90,53 @@ def select_scan_window_from_frame(
     scan_contour = max(contours, key = cv2.contourArea)
     x, y, w, h = cv2.boundingRect(scan_contour)
 
-    # Return the scan window slice of the image
-    scan_window = image[y+y_s:y+h, x+x_s:x+w]
+    scan_window = image[y: y+h, x: x+w]
 
+
+    #
+    # Getting rid of the "line" on the righthand side
+    # Two-step operation that includes:
+    #   1) Erosion on the right-hand region likely including the line
+    #   2) Dilation on the left-hand region
+
+    # Apply another mask to the scan_window
+    mask = cv2.threshold(scan_window, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
+
+    div = 40   
+    r_s = scan_window.shape[1] // div
+    right_slice = mask[:, mask.shape[1] - r_s:]
+    left_slice = mask[:, :mask.shape[1] - r_s]
+
+    right_slice[:] = cv2.erode(
+        right_slice, 
+        np.ones((6,6),np.uint8))
+
+    left_slice[:] = cv2.dilate(
+        left_slice, 
+        np.ones((6,6),np.uint8))
+
+    # cv2.imshow("original mask", mask)
+
+    # Determine mask contours
+    contours = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)[1]
+
+    if len(contours) == 0:
+        raise Exception("Unable to find any matching contours")
+
+    scan_contour = max(contours, key = cv2.contourArea)
+    x_s, y_s, w_s, h_s = cv2.boundingRect(scan_contour)
+
+    right_cropped = scan_window[:, :x_s + w_s]
+
+    # cv2.imshow("right_cropped", right_cropped)
+    # cv2.waitKey(0)
+
+    # Return the scan window slice of the image
+    
     if select_bounds is None:
         return (scan_window, scan_contour)
     else:
-        scan_contour = (x + column_slice.start + x_s, y + row_slice.start + y_s, w, h)
+        scan_contour = (x + column_slice.start, y + row_slice.start, w_s, h)
         return (scan_window, scan_contour)
 
 
@@ -179,19 +221,38 @@ if __name__ == "__main__":
     # construct the argument parse and parse the arguments
     ap = argparse.ArgumentParser()
 
-    ap.add_argument("-i", "--image", required=True,
-        help="path to input image target of OCR subroutine")
+    ap.add_argument("-i", "--image",
+        help="path to input image to run through focus routine")
 
-    ap.add_argument("-p", "--preprocess", type=str, default="thresh",
-        help="type of preprocessing to be done")
+    ap.add_argument("-f", "--folder",
+        help="path to folder of input images to run through focus routine")
         
-    args = vars(ap.parse_args())
+    args = ap.parse_args()
 
-    path = args["image"]
+    if args.folder:
+        for filename in os.listdir(args.folder):
+            image = cv2.imread(args.folder + "/" + filename, cv2.IMREAD_GRAYSCALE)
+            N, M = image.shape
 
-    for filename in os.listdir(path):
-        
-        image = cv2.imread(path + "/" + filename, cv2.IMREAD_GRAYSCALE)
+            scan_window, scan_bounds = select_scan_window_from_frame(
+                image, 
+                5, 255, 
+                select_bounds = (slice(70, N), slice(90, M)))
+
+            x, y, w, h = scan_bounds
+
+            cv2.rectangle(
+                image,
+                (x, y),
+                (x + w, y + h),
+                245,
+                2)
+
+            cv2.imshow("image", image)
+            cv2.waitKey(0)
+
+    elif args.image:
+        image = cv2.imread(args.image, cv2.IMREAD_GRAYSCALE)
         N, M = image.shape
 
         scan_window, scan_bounds = select_scan_window_from_frame(
@@ -210,3 +271,6 @@ if __name__ == "__main__":
 
         cv2.imshow("image", image)
         cv2.waitKey(0)
+
+    else:
+        print("Wrong input arguments")
