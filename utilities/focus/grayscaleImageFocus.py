@@ -3,6 +3,79 @@ import cv2
 import numpy as np
 from constants.ultrasoundConstants import HSV_COLOR_THRESHOLD
 
+def select_focus_from_scan_window():
+    """
+    Selects the focus from a scan window
+
+    The scan window of an ultrasound scan contains the tumor and surrounding tissue. While a radiologist can
+    ignore the tissue on the periphery of a tumor scan, models are sensitive to noise. This function is a simple
+    (naive) method to return the region containing just the tumor (tumor ROI) in the scan window. 
+
+    Arguments:
+        image                               scan window
+    
+    Optional:
+        select_bounds                       Slice of the scan window searched for tumor ROI. Default to full-frame
+                                                passed-in as (row_indices, col_indices)
+
+    Returns:
+        scan_window                         Slice of the scan window containing the tumor ROI
+        scan_bounds                         The rectangular bounds of the tumor ROI (x, y, w, h)
+    """
+
+
+def select_scan_window_from_frame(image, select_bounds=None)
+    """
+    Selects the scan window of a raw ultrasound frame 
+
+    Ultrasound frames contains a significant amount of diagnostic information about the patient and 
+    ongoing scan. The frame boundary regions of the frame will list scan strength, frame scale, etc.
+    This function selects the region of the frame that contains the scan image.
+
+    Arguments:
+        image                               raw ultrasound frame (GRAYSCALE)
+        mask_lower_bound                    lower bound for mask
+        mask_upper_bound                    upper bound for mask
+    
+    Optional:
+        select_bounds                       Slice of the raw frame searched for scan window. Default to full-frame
+                                                passed-in as (row_indices, column_indices)
+
+    Returns:
+        scan_window                         Slice of the raw frame containing the scan window
+        scan_bounds                         The rectangular bounds of the scan window (x, y, w, h) w.r.t to the                                             original frame. Not in the coordinate system of slice.
+    """
+
+    if select_bounds is not None:
+        row_indices, column_indices = select_bounds
+        image = image[row_indices, column_indices]
+
+    mask = cv2.inRange(
+        image, 
+        mask_lower_bound, 
+        mask_upper_bound)
+
+    # Determine contours of the masked image
+    contours = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)[1]
+
+    if len(contours) == 0:
+        raise Exception("Unable to find any matching contours")
+
+    # Contour with maximum enclosed area corresponds to highlight rectangle
+    
+    max_contour = max(contours, key = cv2.contourArea)
+    x, y, w, h = cv2.boundingRect(max_contour)
+
+    # Crop the image to the bounding rectangle
+    focus_image = image[y:y+h, x:x+w]
+
+    if select_bounds is None:
+        return (focus_image, max_contour)
+    else:
+        ret_contour = (x + column_indices[-1], y + row_indices[-1], w, h)
+        return (focus_image, ret_contour)
+
+
 def get_grayscale_image_focus(
     path_to_image, 
     path_to_output_directory, 
@@ -32,30 +105,6 @@ def get_grayscale_image_focus(
     """
     try:
         
-        # Load the image and convert it to HSV from BGR
-        # Then, threshold the HSV image to get only target border color
-        bgr_image = cv2.imread(path_to_image, cv2.IMREAD_COLOR)
-        bgr_image = bgr_image[70:, 90:]
-        mask = cv2.inRange(
-            bgr_image, 
-            HSV_lower_bound, 
-            HSV_upper_bound)
-
-        # Determine contours of the masked image
-
-        contours = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)[1]
-
-        if len(contours) == 0:
-             raise Exception("Unable to find any matching contours")
-
-        # Contour with maximum enclosed area corresponds to highlight rectangle
-        
-        max_contour = max(contours, key = cv2.contourArea)
-        x, y, w, h = cv2.boundingRect(max_contour)
-
-        # Crop the image to the bounding rectangle
-
-        focus_image = bgr_image[y:y+h, x:x+w]
 
   
         # The bounding box includes the border. Remove the border by masking on the same 
