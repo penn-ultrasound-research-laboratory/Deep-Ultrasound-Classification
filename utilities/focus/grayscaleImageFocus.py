@@ -22,9 +22,14 @@ def select_focus_from_scan_window():
         scan_window                         Slice of the scan window containing the tumor ROI
         scan_bounds                         The rectangular bounds of the tumor ROI (x, y, w, h)
     """
+    pass
 
 
-def select_scan_window_from_frame(image, select_bounds=None)
+def select_scan_window_from_frame(
+    image, 
+    mask_lower_bound,
+    mask_upper_bound,
+    select_bounds=None):
     """
     Selects the scan window of a raw ultrasound frame 
 
@@ -39,7 +44,7 @@ def select_scan_window_from_frame(image, select_bounds=None)
     
     Optional:
         select_bounds                       Slice of the raw frame searched for scan window. Default to full-frame
-                                                passed-in as (row_indices, column_indices)
+                                                passed-in as (row_slice, column_slice)
 
     Returns:
         scan_window                         Slice of the raw frame containing the scan window
@@ -47,8 +52,8 @@ def select_scan_window_from_frame(image, select_bounds=None)
     """
 
     if select_bounds is not None:
-        row_indices, column_indices = select_bounds
-        image = image[row_indices, column_indices]
+        row_slice, column_slice = select_bounds
+        image = image[row_slice, column_slice]
 
     mask = cv2.inRange(
         image, 
@@ -72,7 +77,7 @@ def select_scan_window_from_frame(image, select_bounds=None)
     if select_bounds is None:
         return (focus_image, max_contour)
     else:
-        ret_contour = (x + column_indices[-1], y + row_indices[-1], w, h)
+        ret_contour = (x + column_slice.stop, y + row_slice.stop, w, h)
         return (focus_image, ret_contour)
 
 
@@ -165,8 +170,15 @@ if __name__ == "__main__":
         
     args = vars(ap.parse_args())
 
-    get_grayscale_image_focus(
-        args["image"],
-        ".", 
-        np.array(HSV_COLOR_THRESHOLD.LOWER.value, np.uint8), 
-        np.array(HSV_COLOR_THRESHOLD.UPPER.value, np.uint8))
+    image = cv2.imread(args["image"], cv2.IMREAD_GRAYSCALE)
+    N, M = image.shape
+
+    scan_window, scan_bounds = select_scan_window_from_frame(
+        image, 
+        1, 255, 
+        select_bounds = (slice(70, N), slice(90, M)))
+
+    cv2.imshow("window", image)
+
+    cv2.draw
+    cv2.waitKey(0)
