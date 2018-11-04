@@ -99,7 +99,7 @@ def select_scan_window_from_frame(
         scan_window                         Slice of the raw frame containing the scan window
         scan_bounds                         The rectangular bounds of the scan window (x, y, w, h) w.r.t to the                                             original frame. Not in the coordinate system of slice.
     """
-
+    # Optionally slice the input frame
     if select_bounds is not None:
         row_slice, column_slice = select_bounds
         css = column_slice.start
@@ -112,14 +112,9 @@ def select_scan_window_from_frame(
     mask = cv2.threshold(image, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
 
     # Run morphological closing on the center 95% of the mask
-    div = 20   
+    div = 40   
     y_s = N // div
     x_s = M // div
-
-    # mask[slice(y_s, N - y_s), slice(x_s, M - x_s)] = cv2.morphologyEx(
-    #     mask[slice(y_s, N - y_s), slice(x_s, M - x_s)], 
-    #     cv2.MORPH_CLOSE, 
-    #     np.ones((8,8),np.uint8))
 
     center_region = mask[slice(y_s, N - y_s), slice(x_s, M - x_s)] 
     
