@@ -27,6 +27,53 @@ def select_focus_from_scan_window():
     pass
 
 
+def select_out_curvature_line(scan_window):
+    """
+    Selects out the curvature line that sometimes overlaps with the scan window in an ultrasound frame.
+    
+    The curvature line is consistently thin (1-2px). A parallel set of morphological operations is used to "erase"
+    the curvature line. We erode the region known to contain the curvature and dilate the remaining area to 
+    all-but guarantee that the largest contour covers the entire horizontal space.
+ 
+    Arguments:
+        scan_window                         scan window
+
+    Returns:
+        scan_bounds                         The rectangular bounds of largest contour in the scan window after 
+                                                morphological operations
+    """
+    # Apply Otsu thresholding to the scan window
+    mask = cv2.threshold(scan_window, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
+
+    div = 40   
+    r_s = scan_window.shape[1] // div
+    
+    # The "right_slice" may contain a curvature line
+    right_slice = mask[:, mask.shape[1] - r_s:]
+    # The left slice the remainder of the image
+    left_slice = mask[:, :mask.shape[1] - r_s]
+
+    # Erode the right slice
+    right_slice[:] = cv2.erode(
+        right_slice, 
+        np.ones((6,6),np.uint8))
+
+    # Dilate the left slice
+    left_slice[:] = cv2.dilate(
+        left_slice, 
+        np.ones((8,8),np.uint8))
+
+    # Determine mask contours
+    contours = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)[1]
+
+    if len(contours) == 0:
+        raise Exception("Unable to find any matching contours")
+
+    scan_contour = max(contours, key = cv2.contourArea)
+
+    return cv2.boundingRect(scan_contour)
+
+
 def select_scan_window_from_frame(
     image, 
     mask_lower_bound,
@@ -92,44 +139,9 @@ def select_scan_window_from_frame(
 
     scan_window = image[y: y+h, x: x+w]
 
-
-    #
-    # Getting rid of the "line" on the righthand side
-    # Two-step operation that includes:
-    #   1) Erosion on the right-hand region likely including the line
-    #   2) Dilation on the left-hand region
-
-    # Apply another mask to the scan_window
-    mask = cv2.threshold(scan_window, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
-
-    div = 40   
-    r_s = scan_window.shape[1] // div
-    right_slice = mask[:, mask.shape[1] - r_s:]
-    left_slice = mask[:, :mask.shape[1] - r_s]
-
-    right_slice[:] = cv2.erode(
-        right_slice, 
-        np.ones((6,6),np.uint8))
-
-    left_slice[:] = cv2.dilate(
-        left_slice, 
-        np.ones((6,6),np.uint8))
-
-    # cv2.imshow("original mask", mask)
-
-    # Determine mask contours
-    contours = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)[1]
-
-    if len(contours) == 0:
-        raise Exception("Unable to find any matching contours")
-
-    scan_contour = max(contours, key = cv2.contourArea)
-    x_s, y_s, w_s, h_s = cv2.boundingRect(scan_contour)
+    x_s, y_s, w_s, h_s = select_out_curvature_line(scan_window)
 
     right_cropped = scan_window[:, :x_s + w_s]
-
-    # cv2.imshow("right_cropped", right_cropped)
-    # cv2.waitKey(0)
 
     # Return the scan window slice of the image
     
@@ -214,6 +226,8 @@ def get_grayscale_image_focus(
 
     except Exception as exception:
         raise IOError("Error isolating and saving image focus")
+
+
 
 
 if __name__ == "__main__":
