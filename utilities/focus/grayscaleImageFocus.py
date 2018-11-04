@@ -3,7 +3,10 @@ import uuid
 import os
 import cv2
 import numpy as np
-from constants.ultrasoundConstants import HSV_COLOR_THRESHOLD
+from constants.ultrasoundConstants import (
+    HSV_COLOR_THRESHOLD,
+    FRAME_EXTRA_MARGIN_ROWS,
+    FRAME_EXTRA_MARGIN_COLS)
 
 def select_focus_from_scan_window():
     """
@@ -112,7 +115,7 @@ def select_scan_window_from_frame(
     mask = cv2.threshold(image, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
 
     # Run morphological closing on the center 95% of the mask
-    div = 40   
+    div = 30   
     y_s = N // div
     x_s = M // div
 
@@ -134,6 +137,7 @@ def select_scan_window_from_frame(
 
     scan_window = image[y: y+h, x: x+w]
 
+    # Remove the curvature line from the scan window
     x_s, y_s, w_s, h_s = select_out_curvature_line(scan_window)
 
     # Only keep the horizontal information of the found contour. Leverage
@@ -151,11 +155,10 @@ def select_scan_window_from_frame(
         return (scan_window_removed_line, scan_contour)
 
 
-def get_grayscale_image_focus(
+def select_save_frame_tumor_roi(
     path_to_image, 
     path_to_output_directory, 
-    HSV_lower_bound, 
-    HSV_upper_bound,
+    cm=0,
     interpolation_factor=None,
     interpolation_method=cv2.INTER_CUBIC):
     """
@@ -166,52 +169,40 @@ def get_grayscale_image_focus(
     is surrounded by a bright rectangle and saves it to file. 
 
     Arguments:
-        path_to_image: path to input image file
-        path_to_output_directory: path to output directory 
-        HSV_lower_bound: np.array([1, 3], uint8) lower HSV threshold to find highlight box
-        HSV_upper_bound: np.array([1, 3], uint8) upper HSV threshold to find highlight box
+        path_to_image                       path to input image file
+        path_to_output_directory            path to output directory 
+
+    Optional: 
+        cm                                  Global inwards crop to create a margin ("crop margin"). Default 0px
+        interpolation_factor                Factor to use for interpolation != 0. Default None implies no interpolation
+        interpolation_method                Interpolation method to use. Default bicubic interpolation
 
     Returns:
-        path_to_image_focus: path to saved image focus with has as filename
+        output_path                         path to saved image focus with has as filename
 
     Raises:
         IOError: in case of any errors with OpenCV or file operations 
 
     """
     try:
-        
 
-  
-        # The bounding box includes the border. Remove the border by masking on the same 
-        # thresholds as the initial mask, then flip the mask and draw a bounding box. 
+        image = cv2.imread(path_to_image, cv2.IMREAD_GRAYSCALE)
 
-        focus_hsv = cv2.cvtColor(focus_image, cv2.COLOR_BGR2HSV)
-        mask = cv2.inRange(
-            focus_hsv, 
-            HSV_lower_bound, 
-            HSV_upper_bound)
-            
-        mask = cv2.bitwise_not(mask)
-
-        contours = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)[1]
-
-        if len(contours) == 0:
-            raise Exception("Unable to find any matching contours")
-
-        #find the biggest area
-        max_contour = max(contours, key = cv2.contourArea)
-
-        x, y, w, h = cv2.boundingRect(max_contour)
+        scan_window, scan_bounds = select_scan_window_from_frame(
+            image, 
+            5, 255, 
+            select_bounds = (
+                slice(FRAME_EXTRA_MARGIN_ROWS, N), 
+                slice(FRAME_EXTRA_MARGIN_COLS, M)))
 
         # Crop the image to the bounding rectangle
         # As conservative measure crop inwards 3 pixels to guarantee no boundary
-
-        cropped_image = focus_image[y+3:y+h-3, x+3:x+w-3]
-
-        # Interpolate (upscale/downscale) the found segment if an interpolation factor is passed
+        scan_window = scan_window[y + cm: y + h - cm,   x + cm: x + w - cm] 
+ 
+           # Interpolate (upscale/downscale) the found segment if an interpolation factor is passed
         if interpolation_factor is not None:
-            cropped_image = cv2.resize(
-                cropped_image, 
+            scan_window = cv2.resize(
+                scan_window, 
                 None, 
                 fx=interpolation_factor, 
                 fy=interpolation_factor, 
@@ -219,7 +210,7 @@ def get_grayscale_image_focus(
 
         output_path = "{0}/{1}.png".format(path_to_output_directory, uuid.uuid4())
 
-        cv2.imwrite(output_path, cropped_image)
+        cv2.imwrite(output_path, scan_window)
 
         return output_path
 
@@ -271,7 +262,9 @@ if __name__ == "__main__":
         scan_window, scan_bounds = select_scan_window_from_frame(
             image, 
             5, 255, 
-            select_bounds = (slice(70, N), slice(90, M)))
+            select_bounds = (
+                slice(FRAME_EXTRA_MARGIN_ROWS, N), 
+                slice(FRAME_EXTRA_MARGIN_ROWS, M)))
 
         x, y, w, h = scan_bounds
 
