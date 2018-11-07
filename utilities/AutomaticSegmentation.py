@@ -218,11 +218,17 @@ def __determine_roi(image, seed_pt, ks=(2,2)):
     x_exp = N // 20
     y_exp = M // 20
 
+    x_start = max(x - x_exp, 0)
+    x_end = min(x + w + x_exp, N)
+    y_start = max(y - y_exp, 0)
+    y_end = min(y + h + y_exp, M)
+
+    # Return in standard (x, y, w, h) rectangle format
     return (
-        max(x - x_exp, 0),
-        max(y - y_exp, 0),
-        min(x + w + x_exp, N),
-        min(y + h + y_exp, M)
+        x_start,
+        y_start,
+        x_end - x_start,
+        y_end - y_start
     )
 
 def get_ROI_debug(image):

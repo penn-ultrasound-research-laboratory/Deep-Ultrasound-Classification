@@ -102,36 +102,40 @@ def __grayscale_region_of_interest_graphic(
         # Destructure the scan window bounds
         x_s, y_s, w_s, h_s = scan_bounds
 
+        # Run Xian automatic segmentation to get ROI
+        roi_rect, seed_pt = get_ROI_debug(scan_window)
+        x_r, y_r, w_r, h_r = roi_rect
+
+        color_image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
+
         # Draw the rectangle of the scan window onto the original frame
         cv2.rectangle(
-            image,
+            color_image,
             (x_s, y_s),
             (x_s + w_s, y_s + h_s),
-            255,
+            (0, 0, 255),
             2)
 
+        # Draw the ROI rectangle
+        cv2.rectangle(
+            color_image,
+            (x_r + x_s, y_r + y_s),
+            (x_r + x_s + w_r, y_r + y_s + h_r),
+            (0, 255, 0),
+            2)
 
-        # roi_rect, seed_pt = get_ROI_debug(scan_window)
-        # x_r, y_r, w_r, h_r = roi_rect
-
-        # cv2.rectangle(
-        #     image,
-        #     (x_r + x_s, y_r + y_s),
-        #     (x_r + x_s + w_r, y_r + y_s + h_r),
-        #     255,
-        #     2)
+        # Draw the seed point of the tumor ROI
+        cv2.circle(
+            color_image, 
+            (
+                x_s + int(seed_pt[1]), 
+                y_s + int(seed_pt[0])
+            ), 
+            5, 
+            (255, 0, 0), -1)
         
-        # plt.figure()
-        # plt.scatter(x=seed_pt[1], y=seed_pt[0], s=40, c='r')
-        # plt.imshow(frame)
-        # plt.xticks([])
-        # plt.yticks([])
-
-
-
-        cv2.imshow("frame", scan_window)
+        cv2.imshow("Patient: {} | Type: {}".format(p, label), color_image)
         cv2.waitKey(0)
-
 
 
 if __name__ == "__main__":
