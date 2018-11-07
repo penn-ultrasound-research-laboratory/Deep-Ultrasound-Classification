@@ -28,20 +28,17 @@ def __is_frame_clear(self, frame):
     return frame[IMAGE_TYPE_LABEL] == self.image_type.value
 
 
-def __grayscale_region_of_interest_graphic(
-        benign_top_level_path,
-        malignant_top_level_path,
-        manifest_path,
-        frame_folder,
-        rows=1,
-        cols=3):
+def __get_random_frames(
+    benign_top_level_path,
+    malignant_top_level_path,
+    manifest_path,
+    frame_folder,
+    number_frames=3):
 
     dirname = os.path.dirname(__file__)
 
     with open(manifest_path, "r") as fp:
         manifest = json.load(fp)
-
-    K = rows * cols
 
     mpat = [name for name in os.listdir(malignant_top_level_path)
             if os.path.isdir(os.path.join(malignant_top_level_path, name))]
@@ -49,8 +46,8 @@ def __grayscale_region_of_interest_graphic(
     bpat = [name for name in os.listdir(benign_top_level_path)
             if os.path.isdir(os.path.join(benign_top_level_path, name))]
 
-    num_malignant = K // 2
-    num_benign = K - num_malignant
+    num_malignant = number_frames // 2
+    num_benign = number_frames - num_malignant
 
     # Sample the patients 
     mpat_bar = [(p, "MALIGNANT") for p in np.random.choice(mpat, num_malignant)]
@@ -67,8 +64,26 @@ def __grayscale_region_of_interest_graphic(
             benign_top_level_path, p, frame_folder), manifest, p), tag)
         for (p, tag) in bpat_bar]
 
+    return mpat_frames + bpat_frames
+
+
+def __grayscale_region_of_interest_graphic(
+        benign_top_level_path,
+        malignant_top_level_path,
+        manifest_path,
+        frame_folder,
+        rows=1,
+        cols=3):
+
+    random_frames = __get_random_frames(
+        benign_top_level_path,
+        malignant_top_level_path,
+        manifest_path,
+        frame_folder,
+        number_frames=(rows * cols))
+
     # Display the randomly chosen frame
-    for p, f, label in (mpat_frames + bpat_frames):
+    for p, f, label in random_frames:
         print(f)
         frame = cv2.imread(f, cv2.IMREAD_COLOR)
         
