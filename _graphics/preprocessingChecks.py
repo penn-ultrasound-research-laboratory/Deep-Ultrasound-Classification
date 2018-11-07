@@ -11,9 +11,11 @@ from constants.ultrasoundConstants import HSV_COLOR_THRESHOLD
 from constants.ultrasoundConstants import (
     IMAGE_TYPE,
     IMAGE_TYPE_LABEL,
-    FRAME_LABEL)
+    FRAME_LABEL,
+    FRAME_DEFAULT_ROW_CROP_FOR_SCAN_SELECTION,
+    FRAME_DEFAULT_COL_CROP_FOR_SCAN_SELECTION)
 
-from utilities.focus.grayscaleImageFocus import get_scan_area, get_tumor_focus
+from utilities.focus.grayscaleImageFocus import select_scan_window_from_frame
 
 from pipeline.PatientSampleGenerator import PatientSampleGenerator
 
@@ -75,6 +77,7 @@ def __grayscale_region_of_interest_graphic(
         rows=1,
         cols=3):
 
+    # Get random frames from the entire set of patients
     random_frames = __get_random_frames(
         benign_top_level_path,
         malignant_top_level_path,
@@ -84,33 +87,39 @@ def __grayscale_region_of_interest_graphic(
 
     # Display the randomly chosen frame
     for p, f, label in random_frames:
-        print(f)
-        frame = cv2.imread(f, cv2.IMREAD_COLOR)
-        
-        x_s, y_s, w_s, h_s = get_scan_area(
-            frame,
-            np.array(HSV_COLOR_THRESHOLD.LOWER.value, np.uint8),
-            np.array(HSV_COLOR_THRESHOLD.UPPER.value, np.uint8))
-        
+
+        image = cv2.imread(f, cv2.IMREAD_GRAYSCALE)
+        M, N = image.shape
+
+        # Get the scan window
+        scan_window, scan_bounds = select_scan_window_from_frame(
+            image, 
+            5, 255, 
+            select_bounds = (
+                slice(FRAME_DEFAULT_ROW_CROP_FOR_SCAN_SELECTION, M), 
+                slice(FRAME_DEFAULT_COL_CROP_FOR_SCAN_SELECTION, N)))
+
+        # Destructure the scan window bounds
+        x_s, y_s, w_s, h_s = scan_bounds
+
+        # Draw the rectangle of the scan window onto the original frame
         cv2.rectangle(
-            frame,
+            image,
             (x_s, y_s),
             (x_s + w_s, y_s + h_s),
             255,
             2)
 
-        scan_frame = frame[y_s:y_s+h_s, x_s:x_s+w_s]
-        print(scan_frame.shape)
 
-        roi_rect, seed_pt = get_ROI_debug(scan_frame)
-        x_r, y_r, w_r, h_r = roi_rect
+        # roi_rect, seed_pt = get_ROI_debug(scan_window)
+        # x_r, y_r, w_r, h_r = roi_rect
 
-        cv2.rectangle(
-            frame,
-            (x_r, y_r),
-            (x_r + w_r, y_r + h_r),
-            255,
-            2)
+        # cv2.rectangle(
+        #     image,
+        #     (x_r + x_s, y_r + y_s),
+        #     (x_r + x_s + w_r, y_r + y_s + h_r),
+        #     255,
+        #     2)
         
         # plt.figure()
         # plt.scatter(x=seed_pt[1], y=seed_pt[0], s=40, c='r')
@@ -120,7 +129,7 @@ def __grayscale_region_of_interest_graphic(
 
 
 
-        cv2.imshow("frame", frame)
+        cv2.imshow("frame", scan_window)
         cv2.waitKey(0)
 
 
@@ -159,5 +168,7 @@ if __name__ == "__main__":
         ARGS.benign_top_level_path,
         ARGS.malignant_top_level_path,
         ARGS.manifest_path,
-        "frames"
+        "frames",
+        rows = 1,
+        cols= 5
     )

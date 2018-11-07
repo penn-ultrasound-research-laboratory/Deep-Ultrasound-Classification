@@ -231,9 +231,9 @@ def get_ROI_debug(image):
     enhanced = __enhance_hypoechoic_regions(normalized)
     ref_pt = __get_reference_point(enhanced)
     seed_pt, post_cands = __get_seed_point(enhanced, ref_pt)
-    (x,y,w,h) = __determine_roi(enhanced, seed_pt)
+    roi_rect = __determine_roi(enhanced, seed_pt)
 
-    return (x,y,w,h), seed_pt
+    return roi_rect, seed_pt
 
 
 def get_ROI(image):
