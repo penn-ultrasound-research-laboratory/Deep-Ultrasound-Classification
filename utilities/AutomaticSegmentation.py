@@ -218,12 +218,28 @@ def __determine_roi(image, seed_pt, ks=(2,2)):
     x_exp = N // 20
     y_exp = M // 20
 
+    x_start = max(x - x_exp, 0)
+    x_end = min(x + w + x_exp, N)
+    y_start = max(y - y_exp, 0)
+    y_end = min(y + h + y_exp, M)
+
+    # Return in standard (x, y, w, h) rectangle format
     return (
-        max(x - x_exp, 0),
-        max(y - y_exp, 0),
-        min(x + w + x_exp, N),
-        min(y + h + y_exp, M)
+        x_start,
+        y_start,
+        x_end - x_start,
+        y_end - y_start
     )
+
+def get_ROI_debug(image):
+    blur = __gaussian_filter(image)
+    normalized = __linear_normalization(blur)
+    enhanced = __enhance_hypoechoic_regions(normalized)
+    ref_pt = __get_reference_point(enhanced)
+    seed_pt, post_cands = __get_seed_point(enhanced, ref_pt)
+    roi_rect = __determine_roi(enhanced, seed_pt)
+
+    return roi_rect, seed_pt
 
 
 def get_ROI(image):
@@ -233,6 +249,7 @@ def get_ROI(image):
     ref_pt = __get_reference_point(enhanced)
     seed_pt, post_cands = __get_seed_point(enhanced, ref_pt)
     x, y, w, h = __determine_roi(enhanced, seed_pt)
+
     return image[y:y+h, x:x+w]
 
 

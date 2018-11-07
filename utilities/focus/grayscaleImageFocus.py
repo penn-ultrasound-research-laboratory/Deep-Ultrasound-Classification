@@ -136,15 +136,19 @@ def select_scan_window_from_frame(
 
     x_s, y_s, w_s, h_s = select_out_curvature_line(scan_window)
 
-    right_cropped = scan_window[:, :x_s + w_s]
+    # Only keep the horizontal information of the found contour. Leverage
+    # the linearity of the tissue w.r.t to ultrasound scan (tissue stacks like layers).
+    # We found a contour that has the correct width when righthand curvature line removed, no
+    # guarantee on height so forget information
+    scan_window_removed_line = scan_window[:, :x_s + w_s]
 
     # Return the scan window slice of the image
-    
     if select_bounds is None:
-        return (scan_window, scan_contour)
+        return (scan_window_removed_line, scan_contour)
     else:
+        # Contour is with respect to the original image, 
         scan_contour = (x + column_slice.start, y + row_slice.start, w_s, h)
-        return (scan_window, scan_contour)
+        return (scan_window_removed_line, scan_contour)
 
 
 def get_grayscale_image_focus(
