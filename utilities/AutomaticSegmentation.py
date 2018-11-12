@@ -10,6 +10,10 @@ import matplotlib.pyplot as plt
 
 from constants.ultrasoundConstants import IMAGE_TYPE
 from constants.AutomaticSegmentationConstants import (
+    FIND_SEED_POINT_STOPPING_CRITERION,
+    FIND_SEED_POINT_MAXIMUM_ITERATIONS,
+    FIND_SEED_POINT_NUMBER_DIRECTIONS,
+    FIND_SEED_POINT_RADIUS,
     GAUSSIAN_KERNEL_SIZE_PAPER,
     GAUSSIAN_CUTOFF_FREQ_PAPER,
     HYPOECHOIC_LOW_BOUNDARY
@@ -167,7 +171,13 @@ def __get_surrounding_circular_points(center_point, number_directions, radius):
 
     return center_repeated + radius * directed_extension
 
-def __get_seed_point(image, reference_point, number_directions=12, radius=12, eps=2, max_iters=100):
+def __get_seed_point(
+    image, 
+    reference_point,
+    number_directions=FIND_SEED_POINT_NUMBER_DIRECTIONS,
+    radius=FIND_SEED_POINT_RADIUS,
+    stopping_criterion=FIND_SEED_POINT_STOPPING_CRITERION,
+    maximum_iterations=FIND_SEED_POINT_MAXIMUM_ITERATIONS):
     
     image_indices = np.indices(image.shape)
 
@@ -189,13 +199,13 @@ def __get_seed_point(image, reference_point, number_directions=12, radius=12, ep
     
     for direction in range(number_directions):
         p = pre_search_candidates[direction].reshape(2, 1, 1)
-        for it in range(max_iters):
+        for it in range(maximum_iterations):
 
             K_h = flat_kernel_mask(np.linalg.norm(H_neg_sqrt * (image_indices - p), axis=0))
             nc = np.sum(np.multiply(K_h, image).flatten())
             p_new = np.sum(np.multiply(K_h, image_dot_indices), axis=(1,2)) / nc
             
-            if np.linalg.norm(p-p_new < eps):
+            if np.linalg.norm(p-p_new < stopping_criterion):
                 p = p_new
                 break
             
@@ -203,10 +213,11 @@ def __get_seed_point(image, reference_point, number_directions=12, radius=12, ep
         
         max_crit[direction] = nc
         post_search_candidates[direction] = p
-        
-    max_p = post_search_candidates[np.argmax(max_crit), :]
     
-    return max_p, post_search_candidates
+    # Point that maximizes the search criteria. Return as seed point
+    seed_point = post_search_candidates[np.argmax(max_crit), :]
+    
+    return seed_point, post_search_candidates
 
 def __determine_roi(image, seed_pt, ks=(2,2)):
 
