@@ -5,13 +5,23 @@ import os
 import uuid
 import math
 import numpy as np
+import scipy.stats as scp
 import matplotlib.pyplot as plt
 
 from constants.ultrasoundConstants import IMAGE_TYPE
-from scipy.stats import skew
+from constants.AutomaticSegmentationConstants import (
+    GAUSSIAN_KERNEL_SIZE_PAPER,
+    GAUSSIAN_CUTOFF_FREQ_PAPER,
+    HYPOECHOIC_LOW_BOUNDARY
+)
 
-def __seed_point_in_rectangle(seed_pt, rect):
-    x,y,w,h = rect
+COL_START = 0
+ROW_START = 1
+WIDTH = 2
+HEIGHT = 3
+
+def __test_seed_point_in_rectangle(seed_pt, rectangle):
+    x, y, w, h = rectangle
     return (
         seed_pt[1] > x and 
         seed_pt[1] < x + w and
@@ -19,24 +29,21 @@ def __seed_point_in_rectangle(seed_pt, rect):
         seed_pt[0] < y + h
     )
 
-def __rectangle_area(rect):
-    return rect[2] * rect[3]
+def __rectangle_area(rectangle):
+    return rectangle[WIDTH] * rectangle[HEIGHT]
 
 def __gaussian_filter(image):
-    GAUSSIAN_KERNEL_SIZE_PAPER = 301
-    CUTOFF_FREQ_PAPER = 30
     min_dim = np.min(image.shape[:2]) 
     
-    if min_dim >= GAUSSIAN_KERNEL_SIZE_PAPER:
-        ks = GAUSSIAN_KERNEL_SIZE_PAPER
-    else:
-        ks = min_dim
+    # Xian et. al uses a large Gaussian kernel to blur the entire image. 
+    # Their constant kernel size is probably related to their fixed input size.
+    # I assume the minimum dimension of a variable sized input will be fine here. 
 
-    sigma = 1 / (2 * np.pi * CUTOFF_FREQ_PAPER)
+    kernel_size = min_dim if min_dim % 2 == 1 else min_dim - 1
 
-    blur = cv2.GaussianBlur(image, (ks, ks), sigma)
+    sigma = 1 / (2 * np.pi * GAUSSIAN_CUTOFF_FREQ_PAPER)
 
-    return blur
+    return cv2.GaussianBlur(image, (kernel_size, kernel_size), sigma)
 
 def __linear_normalization(image):
     lbound05, ubound95 = np.percentile(image, (5, 95))
@@ -51,23 +58,25 @@ def __linear_normalization(image):
     ])
 
 def __enhance_hypoechoic_regions(image):
-    SN = skew(image.flatten()) 
-    z_a = 20
+    skew = scp.skew(image.flatten()) 
+    
+    # Determine the HYPOECHOIC_HIGH_BOUNDARY
     z_c = np.mean(image)
     
-    if SN <= 0:
-        z_b = (z_a + z_c) / 2
+    # Determine the HYPOECHOIC_MIDDLE_BOUNDARY
+    if skew <= 0:
+        z_b = (HYPOECHOIC_LOW_BOUNDARY + z_c) / 2
     else:
-        z_b = (z_a + z_c * (1-SN)) / 2
+        z_b = (HYPOECHOIC_LOW_BOUNDARY + z_c * (1-skew)) / 2
 
     return np.piecewise(image.astype(float), [
-        image <= z_a,
-        (image > z_a)&(image <= z_b),
+        image <= HYPOECHOIC_LOW_BOUNDARY,
+        (image > HYPOECHOIC_LOW_BOUNDARY)&(image <= z_b),
         (image <= z_c)&(image > z_b)
     ], [
         1,
-        lambda p: 1.0 - ((p - z_a)**2 / ((z_c - z_a) * (z_b - z_a))),
-        lambda p: (p - z_c)**2 / ((z_c - z_a) * (z_c - z_b)),
+        lambda p: 1.0 - ((p - HYPOECHOIC_LOW_BOUNDARY)**2 / ((z_c - HYPOECHOIC_LOW_BOUNDARY) * (z_b - HYPOECHOIC_LOW_BOUNDARY))),
+        lambda p: (p - z_c)**2 / ((z_c - HYPOECHOIC_LOW_BOUNDARY) * (z_c - z_b)),
         0
     ])
     
@@ -147,24 +156,29 @@ def __get_reference_point(image, max_iters=100, eps=2):
 def __unit_flat_kernel(p_diff):
     return 1.0 if p_diff <= 1.0 else 0.0
 
+def __get_surrounding_circular_points(center_point, number_directions, radius):
+
+    center_repeated = np.repeat(center_point.reshape(1,2), number_directions, axis=0)
+
+    directed_extension = np.column_stack((
+        np.cos(2*math.pi*np.arange(number_directions) / number_directions),
+        np.sin(2*math.pi*np.arange(number_directions) / number_directions
+    )))
+
+    return center_repeated + radius * directed_extension
+
 def __get_seed_point(image, rp, nd=12, h=12, eps=2, max_iters=100):
     
-    ind = np.indices(image.shape)
-    
-    pre_cands = np.repeat(rp.reshape(1,2), nd, axis=0)
-
-    ext = np.column_stack((
-        np.cos(2*math.pi*np.arange(nd) / nd),
-        np.sin(2*math.pi*np.arange(nd) / nd
-    )))
+    image_indices = np.indices(image.shape)
 
     H_neg_sqrt = 1 / h
 
     v_msk = np.vectorize(__unit_flat_kernel)
 
-    img_dot_ind = np.multiply(image, ind)
-    
-    pre_cands = pre_cands + h * ext
+    img_dot_ind = np.multiply(image, image_indices)
+
+    pre_cands = __get_surrounding_circular_points(rp, nd, h)
+
     post_cands = np.empty(pre_cands.shape)
     max_crit = np.empty(nd)
     
@@ -172,7 +186,7 @@ def __get_seed_point(image, rp, nd=12, h=12, eps=2, max_iters=100):
         p = pre_cands[d].reshape(2,1,1)
         for it in range(max_iters):
 
-            K_h = v_msk(np.linalg.norm(H_neg_sqrt * (ind - p), axis=0))
+            K_h = v_msk(np.linalg.norm(H_neg_sqrt * (image_indices - p), axis=0))
             nc = np.sum(np.multiply(K_h, image).flatten())
             p_new = np.sum(np.multiply(K_h, img_dot_ind), axis=(1,2)) / nc
             
@@ -209,7 +223,7 @@ def __determine_roi(image, seed_pt, ks=(2,2)):
 
     # Find all bounding rectangles of contours that contain the seed point
     br = [cv2.boundingRect(c) for c in contours]
-    br = [r for r in br if __seed_point_in_rectangle(seed_pt, r)]
+    br = [r for r in br if __test_seed_point_in_rectangle(seed_pt, r)]
 
     # Destructure the minimum bounding rectangle of the minimum area contour containing seed point           
     x, y, w, h = min(br, key = __rectangle_area)
