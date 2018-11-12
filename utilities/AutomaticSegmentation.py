@@ -167,28 +167,33 @@ def __get_surrounding_circular_points(center_point, number_directions, radius):
 
     return center_repeated + radius * directed_extension
 
-def __get_seed_point(image, rp, nd=12, h=12, eps=2, max_iters=100):
+def __get_seed_point(image, reference_point, number_directions=12, radius=12, eps=2, max_iters=100):
     
     image_indices = np.indices(image.shape)
 
-    H_neg_sqrt = 1 / h
+    H_neg_sqrt = 1 / radius
 
-    v_msk = np.vectorize(__unit_flat_kernel)
+    flat_kernel_mask = np.vectorize(__unit_flat_kernel)
 
-    img_dot_ind = np.multiply(image, image_indices)
+    # Dot product of the image with pixel indices
+    image_dot_indices = np.multiply(image, image_indices)
 
-    pre_cands = __get_surrounding_circular_points(rp, nd, h)
+    # Initial candidates for ROI search are circle surrounding reference reference point
+    pre_search_candidates = __get_surrounding_circular_points(
+        reference_point, 
+        number_directions, 
+        radius)
 
-    post_cands = np.empty(pre_cands.shape)
-    max_crit = np.empty(nd)
+    post_search_candidates = np.empty(pre_search_candidates.shape)
+    max_crit = np.empty(number_directions)
     
-    for d in range(nd):
-        p = pre_cands[d].reshape(2,1,1)
+    for direction in range(number_directions):
+        p = pre_search_candidates[direction].reshape(2, 1, 1)
         for it in range(max_iters):
 
-            K_h = v_msk(np.linalg.norm(H_neg_sqrt * (image_indices - p), axis=0))
+            K_h = flat_kernel_mask(np.linalg.norm(H_neg_sqrt * (image_indices - p), axis=0))
             nc = np.sum(np.multiply(K_h, image).flatten())
-            p_new = np.sum(np.multiply(K_h, img_dot_ind), axis=(1,2)) / nc
+            p_new = np.sum(np.multiply(K_h, image_dot_indices), axis=(1,2)) / nc
             
             if np.linalg.norm(p-p_new < eps):
                 p = p_new
@@ -196,12 +201,12 @@ def __get_seed_point(image, rp, nd=12, h=12, eps=2, max_iters=100):
             
             p = p_new
         
-        max_crit[d] = nc
-        post_cands[d] = p
+        max_crit[direction] = nc
+        post_search_candidates[direction] = p
         
-    max_p = post_cands[np.argmax(max_crit), :]
+    max_p = post_search_candidates[np.argmax(max_crit), :]
     
-    return max_p, post_cands
+    return max_p, post_search_candidates
 
 def __determine_roi(image, seed_pt, ks=(2,2)):
 
@@ -219,7 +224,7 @@ def __determine_roi(image, seed_pt, ks=(2,2)):
     im2, contours, hierarchy = cv2.findContours(
         img_morph,
         cv2.RETR_TREE,
-        cv2.CHAIN_APPROX_SIMPLE)    
+        cv2.CHAIN_APPROX_SIMPLE)
 
     # Find all bounding rectangles of contours that contain the seed point
     br = [cv2.boundingRect(c) for c in contours]
@@ -250,7 +255,7 @@ def get_ROI_debug(image):
     normalized = __linear_normalization(blur)
     enhanced = __enhance_hypoechoic_regions(normalized)
     ref_pt = __get_reference_point(enhanced)
-    seed_pt, post_cands = __get_seed_point(enhanced, ref_pt)
+    seed_pt, post_search_candidates = __get_seed_point(enhanced, ref_pt)
     roi_rect = __determine_roi(enhanced, seed_pt)
 
     return roi_rect, seed_pt
@@ -261,7 +266,7 @@ def get_ROI(image):
     normalized = __linear_normalization(blur)
     enhanced = __enhance_hypoechoic_regions(normalized)
     ref_pt = __get_reference_point(enhanced)
-    seed_pt, post_cands = __get_seed_point(enhanced, ref_pt)
+    seed_pt, post_search_candidates = __get_seed_point(enhanced, ref_pt)
     x, y, w, h = __determine_roi(enhanced, seed_pt)
 
     return image[y:y+h, x:x+w]
