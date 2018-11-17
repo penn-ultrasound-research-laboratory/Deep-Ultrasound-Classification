@@ -33,19 +33,19 @@ def determine_image_type(bgr_image):
         return IMAGE_TYPE.COLOR
 
 
-def center_crop(image, target_shape, origin=None):
-    """Crop the center portion of a color image
+def center_crop_to_target_shape(image, target_shape, origin=None):
+    """Crop the center portion of an image to a target shape
 
     Arguments:
-        image                                An image. Either single channel (grayscale) or multi-channel (color)
-        target_shape                         Target shape of the image section to crop
+        image                               An image. Either single channel (grayscale) or multi-channel (color)
+        target_shape                        Target shape of the image section to crop
 
     Optional:
-        origin                               Tuple containing hardcoded origin (row_offset, column_offset). The "origin"
+        origin                              Tuple containing hardcoded origin (row_offset, column_offset). The "origin"
                                                 is the upper-left corner of the cropped image relative to 
                                                 the top left at (0,0).
     Returns:
-        A cropped color image if both the target width and target height are
+        A cropped image if both the target width and target height are
         less than the actual width and actual height. 
         Else, returns the original image without cropping.
 
@@ -53,23 +53,61 @@ def center_crop(image, target_shape, origin=None):
     """
     is_multi_channel = len(image.shape) == 3
 
-    number_rows, number_cols = image.shape[:2] if is_multi_channel else image.shape
-    height, width = target_shape[:2] if is_multi_channel else target_shape
+    original_height, original_width = image.shape[:2] if is_multi_channel else image.shape
+    target_height, target_width = target_shape[:2] if is_multi_channel else target_shape
 
-    if width > number_cols or height > number_rows:
+    if target_width > original_width or target_height > original_height:
         return image
 
     column_offset = (
-        (number_cols // 2) - (width // 2) if origin is None
+        (original_width // 2) - (target_width // 2) if origin is None
         else origin[1])
         
     row_offset = (
-        (number_rows // 2) - (height // 2) if origin is None 
+        (original_height // 2) - (target_height // 2) if origin is None 
         else origin[0])
    
     return image[
-        row_offset: row_offset + height,
-        column_offset: column_offset + width]
+        row_offset: row_offset + target_height,
+        column_offset: column_offset + target_width]
+
+
+def center_crop_to_target_percentage(image, height_fraction, width_fraction):
+    """Crop the center portion of an image to a target shape
+
+    Arguments:
+        image                               An image. Either single channel (grayscale) or multi-channel (color)
+        height_fraction                     Target height fraction of the image to crop. 0 > arg >= 1 
+                                                (e.g. 0.95 for 95%)
+        width_fraction                      Target width fraction of the image to crop. 0 > arg >= 1
+                                                (e.g. 0.95 for 95%)
+    Returns:
+        A cropped image if both the target width and target height are
+        less than or equal to 1. Else, returns the original image without cropping.
+        Additionally, returns the cropping bounds as a tuple. 
+    """
+    if height_fraction <= 0 or height_fraction > 1 or width_fraction <= 0 or width_fraction > 1:
+        return image
+
+    is_multi_channel = len(image.shape) == 3
+
+    original_height, original_width = image.shape[:2] if is_multi_channel else image.shape
+
+    height_divisor = 1 / height_fraction
+    width_divisor = 1 / width_fraction
+
+    height_remainder = original_height - (original_height // height_divisor)
+    width_remainder = original_width - (original_width // width_divisor)
+
+    top_crop = int(height_remainder // 2)
+    bottom_crop = int(height_divisor - top_crop)
+    left_crop = int(width_remainder // 2)
+    right_crop = int(width_remainder - left_crop)
+
+    cropped_slice = image[top_crop: original_height - bottom_crop, left_crop: original_width - right_crop]
+    cropping_bounds = (top_crop, bottom_crop, left_crop, right_crop)
+
+    return cropped_slice, cropping_bounds
 
 
 def image_random_sampling_batch(
@@ -157,7 +195,7 @@ def image_random_sampling_batch(
                 np.random.randint(0, column_origin_max, batch_size) if column_origin_max > 0
                 else [0] * batch_size)
 
-        return np.stack(map(lambda sample_index: center_crop(
+        return np.stack(map(lambda sample_index: center_crop_to_target_shape(
             image,
             target_shape,
             origin=(row_origins[sample_index], column_origins[sample_index])),

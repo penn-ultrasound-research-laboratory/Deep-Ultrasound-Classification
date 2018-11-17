@@ -8,35 +8,13 @@ from constants.ultrasoundConstants import (
     FRAME_EXTRA_MARGIN_ROWS,
     FRAME_EXTRA_MARGIN_COLS)
 
-def select_focus_from_scan_window():
-    """
-    Selects the focus from a scan window
-
-    The scan window of an ultrasound scan contains the tumor and surrounding tissue. While a radiologist can
-    ignore the tissue on the periphery of a tumor scan, models are sensitive to noise. This function is a simple
-    (naive) method to return the region containing just the tumor (tumor ROI) in the scan window. 
-
-    Arguments:
-        image                               scan window
-    
-    Optional:
-        select_bounds                       Slice of the scan window searched for tumor ROI. Default to full-frame
-                                                passed-in as (row_indices, col_indices)
-
-    Returns:
-        scan_window                         Slice of the scan window containing the tumor ROI
-        scan_bounds                         The rectangular bounds of the tumor ROI (x, y, w, h)
-    """
-    pass
-
-
 def select_out_curvature_line(scan_window):
     """
     Selects out the curvature line that sometimes overlaps with the scan window in an ultrasound frame.
     
     The curvature line is consistently thin (1-2px). A parallel set of morphological operations is used to "erase"
     the curvature line. We erode the region known to contain the curvature and dilate the remaining area to 
-    all-but guarantee that the largest contour covers the entire horizontal space.
+    all but guarantee that the largest contour covers the entire horizontal space.
  
     Arguments:
         scan_window                         scan window
@@ -216,8 +194,6 @@ def select_save_frame_tumor_roi(
 
     except Exception as exception:
         raise IOError("Error isolating and saving image focus")
-
-
 
 
 if __name__ == "__main__":
