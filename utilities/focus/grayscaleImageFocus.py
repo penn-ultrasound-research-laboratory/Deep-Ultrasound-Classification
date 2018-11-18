@@ -3,41 +3,32 @@ import uuid
 import os
 import cv2
 import numpy as np
-from constants.ultrasoundConstants import HSV_COLOR_THRESHOLD
+from constants.ultrasoundConstants import (
+    HSV_COLOR_THRESHOLD,
+    FRAME_DEFAULT_ROW_CROP_FOR_SCAN_SELECTION,
+    FRAME_DEFAULT_COL_CROP_FOR_SCAN_SELECTION)
 
-def select_focus_from_scan_window():
-    """
-    Selects the focus from a scan window
-
-    The scan window of an ultrasound scan contains the tumor and surrounding tissue. While a radiologist can
-    ignore the tissue on the periphery of a tumor scan, models are sensitive to noise. This function is a simple
-    (naive) method to return the region containing just the tumor (tumor ROI) in the scan window. 
-
-    Arguments:
-        image                               scan window
-    
-    Optional:
-        select_bounds                       Slice of the scan window searched for tumor ROI. Default to full-frame
-                                                passed-in as (row_indices, col_indices)
-
-    Returns:
-        scan_window                         Slice of the scan window containing the tumor ROI
-        scan_bounds                         The rectangular bounds of the tumor ROI (x, y, w, h)
-    """
-    pass
-
-
-def select_out_curvature_line(scan_window):
+def select_out_curvature_line(
+    scan_window,
+    target_slice_percentage=0.025,
+    target_slice_erosion_kernel_size=(6,6),
+    remain_slice_dilation_kernel_size=(8,8)):
     """
     Selects out the curvature line that sometimes overlaps with the scan window in an ultrasound frame.
     
     The curvature line is consistently thin (1-2px). A parallel set of morphological operations is used to "erase"
     the curvature line. We erode the region known to contain the curvature and dilate the remaining area to 
-    all-but guarantee that the largest contour covers the entire horizontal space.
+    all but guarantee that the largest contour covers the entire horizontal space.
  
     Arguments:
         scan_window                         scan window
+        
+    Optional:
+        target_slice_percentage             Percentage taken from the righthand side of the image to erase a curvature                                      line. Default 0.025 or 2.5%
 
+        target_slice_erosion_kernel_size    Size of the erosion kernel used to "erase" the curvature line
+
+        remain_slice_dilation_kernel_size   Size of the dilation kernel used to fill-in the remainder of the image not                                      included in the target slice
     Returns:
         scan_bounds                         The rectangular bounds of largest contour in the scan window after 
                                                 morphological operations
@@ -45,23 +36,23 @@ def select_out_curvature_line(scan_window):
     # Apply Otsu thresholding to the scan window
     mask = cv2.threshold(scan_window, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
 
-    div = 40   
-    r_s = scan_window.shape[1] // div
+    r_s = int(scan_window.shape[1] // (1 / target_slice_percentage))
     
-    # The "right_slice" may contain a curvature line
-    right_slice = mask[:, mask.shape[1] - r_s:]
-    # The left slice the remainder of the image
-    left_slice = mask[:, :mask.shape[1] - r_s]
+    # The target (right) slice may contain a curvature line
+    target_slice = mask[:, mask.shape[1] - r_s:]
 
-    # Erode the right slice
-    right_slice[:] = cv2.erode(
-        right_slice, 
-        np.ones((6,6),np.uint8))
+    # The remainder (left) slice is the remainder of the image outside the target slice
+    remainder_slice = mask[:, :mask.shape[1] - r_s]
 
-    # Dilate the left slice
-    left_slice[:] = cv2.dilate(
-        left_slice, 
-        np.ones((8,8),np.uint8))
+    # Erode the target slice
+    target_slice[:] = cv2.erode(
+        target_slice, 
+        np.ones(target_slice_erosion_kernel_size, np.uint8))
+
+    # Dilate the remainder slice
+    remainder_slice[:] = cv2.dilate(
+        remainder_slice, 
+        np.ones(remain_slice_dilation_kernel_size, np.uint8))
 
     # Determine mask contours
     contours = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)[1]
@@ -78,7 +69,9 @@ def select_scan_window_from_frame(
     image, 
     mask_lower_bound,
     mask_upper_bound,
-    select_bounds=None):
+    select_bounds=None,
+    center_slice_percentage=0.966667,
+    center_slice_dilation_kernel_size=(8,8)):
     """
     Selects the scan window of a raw ultrasound frame 
 
@@ -95,6 +88,10 @@ def select_scan_window_from_frame(
         select_bounds                       Slice of the raw frame searched for scan window. Default to full-frame
                                                 passed-in as (row_slice, column_slice)
 
+        center_slice_percentage             Percentage of the image taken from the center that will be dilated.                                             Dilating the center portion of the image supports better contour search
+
+        center_slice_dilation_kernel_size   Size of the dilation kernel used to fill-in the center region of the image
+
     Returns:
         scan_window                         Slice of the raw frame containing the scan window
         scan_bounds                         The rectangular bounds of the scan window (x, y, w, h) w.r.t to the                                             original frame. Not in the coordinate system of slice.
@@ -102,8 +99,6 @@ def select_scan_window_from_frame(
     # Optionally slice the input frame
     if select_bounds is not None:
         row_slice, column_slice = select_bounds
-        css = column_slice.start
-        rss = row_slice.start
         image = image[row_slice, column_slice]
 
     N, M = image.shape
@@ -111,16 +106,16 @@ def select_scan_window_from_frame(
     # Otsu thresholding on the image to remove background
     mask = cv2.threshold(image, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
 
-    # Run morphological closing on the center 95% of the mask
-    div = 40   
-    y_s = N // div
-    x_s = M // div
+    # Run morphological closing on the target center percentage of the mask
+    y_s = int(N // (1 / center_slice_percentage))
+    x_s = int(M // (1 / center_slice_percentage))
 
     center_region = mask[slice(y_s, N - y_s), slice(x_s, M - x_s)] 
     
+    # Dilate the center slice of the mask to make contour search more effective
     center_region[:] = cv2.dilate(
         center_region, 
-        np.ones((8,8),np.uint8))
+        np.ones(center_slice_dilation_kernel_size, np.uint8))
 
     # Determine mask contours
     contours = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)[1]
@@ -132,9 +127,10 @@ def select_scan_window_from_frame(
     scan_contour = max(contours, key = cv2.contourArea)
     x, y, w, h = cv2.boundingRect(scan_contour)
 
-    scan_window = image[y: y+h, x: x+w]
+    scan_window = image[y: y + h, x: x + w]
 
-    x_s, y_s, w_s, h_s = select_out_curvature_line(scan_window)
+    # Remove the curvature line from the scan window
+    x_s, y_s, w_s, _ = select_out_curvature_line(scan_window)
 
     # Only keep the horizontal information of the found contour. Leverage
     # the linearity of the tissue w.r.t to ultrasound scan (tissue stacks like layers).
@@ -151,82 +147,74 @@ def select_scan_window_from_frame(
         return (scan_window_removed_line, scan_contour)
 
 
-def get_grayscale_image_focus(
-    path_to_image, 
-    path_to_output_directory, 
-    HSV_lower_bound, 
-    HSV_upper_bound,
-    interpolation_factor=None,
-    interpolation_method=cv2.INTER_CUBIC):
+def load_select_scan_window(path_to_image, cm=5):
     """
-    Determines the "focus" of an ultrasound frame in Color/CPA. 
-
-    Ultrasound frames in Color/CPA mode highlight the tumor under examination to 
-    focus the direction of the scan. This function extracts the highlighted region, which
-    is surrounded by a bright rectangle and saves it to file. 
+    Load and Select the scan window of an ultrasound frame 
 
     Arguments:
-        path_to_image: path to input image file
-        path_to_output_directory: path to output directory 
-        HSV_lower_bound: np.array([1, 3], uint8) lower HSV threshold to find highlight box
-        HSV_upper_bound: np.array([1, 3], uint8) upper HSV threshold to find highlight box
+        path_to_image                       path to input image file
+
+    Optional: 
+        cm                                  Global inwards crop to create a margin ("crop margin"). Default 5px
 
     Returns:
-        path_to_image_focus: path to saved image focus with has as filename
+        scan_window                         The found scan window of the frame
 
     Raises:
         IOError: in case of any errors with OpenCV or file operations 
-
     """
     try:
-        
 
-  
-        # The bounding box includes the border. Remove the border by masking on the same 
-        # thresholds as the initial mask, then flip the mask and draw a bounding box. 
+        image = cv2.imread(path_to_image, cv2.IMREAD_GRAYSCALE)
 
-        focus_hsv = cv2.cvtColor(focus_image, cv2.COLOR_BGR2HSV)
-        mask = cv2.inRange(
-            focus_hsv, 
-            HSV_lower_bound, 
-            HSV_upper_bound)
-            
-        mask = cv2.bitwise_not(mask)
-
-        contours = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)[1]
-
-        if len(contours) == 0:
-            raise Exception("Unable to find any matching contours")
-
-        #find the biggest area
-        max_contour = max(contours, key = cv2.contourArea)
-
-        x, y, w, h = cv2.boundingRect(max_contour)
+        scan_window, scan_bounds = select_scan_window_from_frame(
+            image, 
+            5, 255, 
+            select_bounds = (
+                slice(FRAME_DEFAULT_ROW_CROP_FOR_SCAN_SELECTION, N), 
+                slice(FRAME_DEFAULT_COL_CROP_FOR_SCAN_SELECTION, M)))
 
         # Crop the image to the bounding rectangle
         # As conservative measure crop inwards 3 pixels to guarantee no boundary
+        scan_window = scan_window[y + cm: y + h - cm,   x + cm: x + w - cm] 
 
-        cropped_image = focus_image[y+3:y+h-3, x+3:x+w-3]
-
-        # Interpolate (upscale/downscale) the found segment if an interpolation factor is passed
-        if interpolation_factor is not None:
-            cropped_image = cv2.resize(
-                cropped_image, 
-                None, 
-                fx=interpolation_factor, 
-                fy=interpolation_factor, 
-                interpolation=interpolation_method)
-
-        output_path = "{0}/{1}.png".format(path_to_output_directory, uuid.uuid4())
-
-        cv2.imwrite(output_path, cropped_image)
-
-        return output_path
+        return scan_window
 
     except Exception as exception:
         raise IOError("Error isolating and saving image focus")
 
 
+def load_select_save_scan_window(
+    path_to_image, 
+    path_to_output_directory, 
+    cm=0):
+    """
+    Load, Select, and Save the scan window of a grayscale ultrasound frame
+
+    Arguments:
+        path_to_image                       Path to input image file
+        path_to_output_directory            Path to output directory 
+
+    Optional: 
+        cm                                  Global inwards crop to create a margin ("crop margin"). Default 0px
+
+    Returns:
+        output_path                         Path to saved scan window
+
+    Raises:
+        IOError: in case of any errors with OpenCV or file operations 
+    """
+    try:
+        scan_window = load_select_scan_window(path_to_image, cm)
+
+        output_path = "{0}/{1}.png".format(path_to_output_directory, uuid.uuid4())
+
+        cv2.imwrite(output_path, scan_window)
+
+        return output_path
+
+    except Exception as exception:
+        raise IOError("Error isolating and saving image focus")
 
 
 if __name__ == "__main__":
@@ -271,7 +259,9 @@ if __name__ == "__main__":
         scan_window, scan_bounds = select_scan_window_from_frame(
             image, 
             5, 255, 
-            select_bounds = (slice(70, N), slice(90, M)))
+            select_bounds = (
+                slice(FRAME_DEFAULT_ROW_CROP_FOR_SCAN_SELECTION, N), 
+                slice(FRAME_DEFAULT_COL_CROP_FOR_SCAN_SELECTION, M)))
 
         x, y, w, h = scan_bounds
 
