@@ -10,7 +10,8 @@ def get_color_image_focus(
     HSV_lower_bound, 
     HSV_upper_bound,
     interpolation_factor=None,
-    interpolation_method=cv2.INTER_CUBIC):
+    interpolation_method=cv2.INTER_CUBIC,
+    crop_inside_boundary_radius=3):
     """
     Determines the "focus" of an ultrasound frame in Color/CPA. 
 
@@ -23,6 +24,14 @@ def get_color_image_focus(
         path_to_output_directory: path to output directory 
         HSV_lower_bound: np.array([1, 3], uint8) lower HSV threshold to find highlight box
         HSV_upper_bound: np.array([1, 3], uint8) upper HSV threshold to find highlight box
+
+    Optional:
+    interpolation_factor                    Factor to use to use for interpolation. e.g. 0.5 is downscale by 2x
+    
+    interpolation_method                    Method to use for interpolation. Default is bicubic interpolation
+
+    crop_inside_boundary_radius             Crop center of found image focus creating boundary of radius pixels.
+                                                Default is 2px boundary radius.
 
     Returns:
         path_to_image_focus: path to saved image focus with has as filename

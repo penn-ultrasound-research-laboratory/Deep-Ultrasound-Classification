@@ -253,8 +253,8 @@ if __name__ == "__main__":
             image, 
             5, 255, 
             select_bounds = (
-                slice(FRAME_EXTRA_MARGIN_ROWS, N), 
-                slice(FRAME_EXTRA_MARGIN_ROWS, M)))
+                slice(FRAME_DEFAULT_ROW_CROP_FOR_SCAN_SELECTION, N), 
+                slice(FRAME_DEFAULT_COL_CROP_FOR_SCAN_SELECTION, M)))
 
         x, y, w, h = scan_bounds
 
