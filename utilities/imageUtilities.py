@@ -110,6 +110,41 @@ def center_crop_to_target_percentage(image, height_fraction, width_fraction):
     return cropped_slice, cropping_bounds
 
 
+def center_crop_to_target_pixel_boundary(image, height_pixel_boundary, width_pixel_boundary):
+    """Crop the center portion of an image to a target shape
+
+    Arguments:
+        image                               An image. Either single channel (grayscale) or multi-channel (color)
+        height_pixel_boundary               Target height pixel boundary of the image to crop. arg > 0 
+                                                (e.g. 3 for 3px)
+        width_pixel_boundary                Target width pixel boundary of the image to crop. arg > 0
+                                                (e.g. 3 for 3px)
+    Returns:
+        A cropped image if both the target width and target height are
+        greater than 0. Else, returns the original image without cropping.
+        Additionally, returns the cropping bounds as a tuple. 
+    """
+    if height_pixel_boundary < 0 or width_pixel_boundary< 0:
+        return image
+
+    is_multi_channel = len(image.shape) == 3
+
+    original_height, original_width = image.shape[:2] if is_multi_channel else image.shape
+
+    cropped_slice = image[
+        height_pixel_boundary: original_height - height_pixel_boundary,
+        width_pixel_boundary: original_width - width_pixel_boundary
+    ]
+
+    cropping_bounds = (
+        height_pixel_boundary,
+        height_pixel_boundary,
+        width_pixel_boundary,
+        width_pixel_boundary)
+
+    return cropped_slice, cropping_bounds
+
+
 def image_random_sampling_batch(
     image, 
     target_shape = None, 
