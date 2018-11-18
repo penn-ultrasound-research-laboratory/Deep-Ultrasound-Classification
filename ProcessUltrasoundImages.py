@@ -2,6 +2,7 @@ import argparse
 import json
 import logging
 import os
+import uuid
 
 from datetime import datetime
 
@@ -9,7 +10,7 @@ import cv2
 import numpy as np
 
 from utilities.imageUtilities import determine_image_type
-from utilities.focus.colorImageFocus import get_color_image_focus
+from utilities.focus.colorImageFocus import load_select_color_image_focus
 from utilities.focus.grayscaleImageFocus import get_grayscale_image_focus
 from utilities.ocrUtilities import isolate_text
 
@@ -42,12 +43,25 @@ def frame_segmentation(
     missing scale for a frame
     """
     if image_type is IMAGE_TYPE.COLOR:
-        hash_path = get_color_image_focus(
+
+        # Load color frame and select the image focus
+        image_focus = load_select_color_image_focus(
             path_to_frame,
-            abs_path_to_focus_output_dir,
             np.array(HSV_COLOR_THRESHOLD.LOWER.value, np.uint8),
-            np.array(HSV_COLOR_THRESHOLD.UPPER.value, np.uint8),
-            interpolation_factor=interpolation_factor)
+            np.array(HSV_COLOR_THRESHOLD.UPPER.value, np.uint8))
+
+        # Optionally run interpolation
+        if interpolation_factor is not None:
+            image_focus = cv2.resize(
+                image_focus, 
+                None, 
+                fx=interpolation_factor, 
+                fy=interpolation_factor)
+
+        # Save the image focus to file
+        hash_path = "{0}/{1}.png".format(abs_path_to_focus_output_dir, uuid.uuid4())
+        cv2.imwrite(hash_path, image_focus)
+
     else:
         hash_path = get_grayscale_image_focus(
             path_to_frame,

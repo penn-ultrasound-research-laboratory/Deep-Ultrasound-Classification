@@ -80,18 +80,52 @@ def get_color_image_focus(
     return image_focus
 
 
-def select_save_color_image_focus(
+def load_select_color_image_focus(
+    path_to_image, 
+    HSV_lower_bound, 
+    HSV_upper_bound,
+    crop_inside_boundary_radius=3):
+    """
+    Load and Select color image focus of an input frame
+
+    Arguments:
+        path_to_image                       Path to input image file
+        HSV_lower_bound                     np.array([1, 3], uint8) lower HSV threshold to find highlight box
+        HSV_upper_bound                     np.array([1, 3], uint8) upper HSV threshold to find highlight box
+
+    Optional:
+        crop_inside_boundary_radius         Crop center of found image focus creating boundary of radius pixels.
+                                                Default is 2px boundary radius.
+    Returns:
+        image_focus                         The found color image focus
+
+    Raises:
+        IOError: in case of any errors with OpenCV or file operations 
+    """
+    try:
+        bgr_image = cv2.imread(path_to_image, cv2.IMREAD_COLOR)
+
+        image_focus = get_color_image_focus(
+            bgr_image,
+            HSV_lower_bound,
+            HSV_upper_bound,
+            crop_inside_boundary_radius
+        )
+
+        return image_focus
+
+    except Exception as e:
+        raise IOError("Error isolating and saving image focus. " + str(e))
+
+
+def load_select_save_color_image_focus(
     path_to_image, 
     path_to_output_directory, 
     HSV_lower_bound, 
     HSV_upper_bound,
     crop_inside_boundary_radius=3):
     """
-    Determines the "focus" of an ultrasound frame in Color/CPA. 
-
-    Ultrasound frames in Color/CPA mode highlight the tumor under examination to 
-    focus the direction of the scan. This function extracts the highlighted region, which
-    is surrounded by a bright rectangle and saves it to file. 
+    Load, Select, and Save color image focus of an input frame
 
     Arguments:
         path_to_image                       Path to input image file
@@ -109,10 +143,8 @@ def select_save_color_image_focus(
         IOError: in case of any errors with OpenCV or file operations 
     """
     try:
-        bgr_image = cv2.imread(path_to_image, cv2.IMREAD_COLOR)
-
-        cropped_image = get_color_image_focus(
-            bgr_image,
+        image_focus = load_select_color_image_focus(
+            path_to_image,
             HSV_lower_bound,
             HSV_upper_bound,
             crop_inside_boundary_radius
@@ -120,7 +152,7 @@ def select_save_color_image_focus(
 
         output_path = "{0}/{1}.png".format(path_to_output_directory, uuid.uuid4())
 
-        cv2.imwrite(output_path, cropped_image)
+        cv2.imwrite(output_path, image_focus)
 
         return output_path
 
@@ -141,8 +173,10 @@ if __name__ == "__main__":
         
     args = vars(ap.parse_args())
 
-    select_save_color_image_focus(
+    image_focus = load_select_color_image_focus(
         args["image"],
-        ".", 
         np.array(HSV_COLOR_THRESHOLD.LOWER.value, np.uint8), 
         np.array(HSV_COLOR_THRESHOLD.UPPER.value, np.uint8))
+
+    cv2.imshow("focus", image_focus)
+    cv2.waitKey(0)
