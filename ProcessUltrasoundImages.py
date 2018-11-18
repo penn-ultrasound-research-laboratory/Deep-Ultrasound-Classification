@@ -11,7 +11,7 @@ import numpy as np
 
 from utilities.imageUtilities import determine_image_type
 from utilities.focus.colorImageFocus import load_select_color_image_focus
-from utilities.focus.grayscaleImageFocus import get_grayscale_image_focus
+from utilities.focus.grayscaleImageFocus import load_select_scan_window
 from utilities.ocrUtilities import isolate_text
 
 from constants.ultrasoundConstants import (
@@ -49,26 +49,28 @@ def frame_segmentation(
             path_to_frame,
             np.array(HSV_COLOR_THRESHOLD.LOWER.value, np.uint8),
             np.array(HSV_COLOR_THRESHOLD.UPPER.value, np.uint8))
-
-        # Optionally run interpolation
-        if interpolation_factor is not None:
-            image_focus = cv2.resize(
-                image_focus, 
-                None, 
-                fx=interpolation_factor, 
-                fy=interpolation_factor)
-
-        # Save the image focus to file
-        hash_path = "{0}/{1}.png".format(abs_path_to_focus_output_dir, uuid.uuid4())
-        cv2.imwrite(hash_path, image_focus)
-
     else:
-        hash_path = get_grayscale_image_focus(
-            path_to_frame,
-            abs_path_to_focus_output_dir,
+
+        # Load grayscale frame and select the scan window
+        image_focus = load_select_scan_window(
+            path_to_frame, 
             np.array(HSV_GRAYSCALE_THRESHOLD.LOWER.value, np.uint8),
-            np.array(HSV_GRAYSCALE_THRESHOLD.UPPER.value, np.uint8),
-            interpolation_factor=interpolation_factor)
+            np.array(HSV_GRAYSCALE_THRESHOLD.UPPER.value, np.uint8))
+
+        # TODO PENN-42: The scan window of a grayscale ultrasound frame is NOT the final image focus
+        # Integrate automatic segmentation (Xian) here to get the the tumor ROI (image focus)
+        # from the scan window. Note: this only applies to grayscale frames
+
+    # Optionally run interpolation
+    if interpolation_factor is not None:
+        image_focus = cv2.resize(
+            image_focus, 
+            None, 
+            fx=interpolation_factor, 
+            fy=interpolation_factor)
+
+    hash_path = "{0}/{1}.png".format(abs_path_to_focus_output_dir, uuid.uuid4())
+    cv2.imwrite(hash_path, image_focus)
 
     return hash_path
 

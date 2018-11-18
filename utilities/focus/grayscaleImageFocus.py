@@ -147,34 +147,21 @@ def select_scan_window_from_frame(
         return (scan_window_removed_line, scan_contour)
 
 
-def select_save_frame_tumor_roi(
-    path_to_image, 
-    path_to_output_directory, 
-    cm=0,
-    interpolation_factor=None,
-    interpolation_method=cv2.INTER_CUBIC):
+def load_select_scan_window(path_to_image, cm=5):
     """
-    Determines the "focus" of an ultrasound frame in Color/CPA. 
-
-    Ultrasound frames in Color/CPA mode highlight the tumor under examination to 
-    focus the direction of the scan. This function extracts the highlighted region, which
-    is surrounded by a bright rectangle and saves it to file. 
+    Load and Select the scan window of an ultrasound frame 
 
     Arguments:
         path_to_image                       path to input image file
-        path_to_output_directory            path to output directory 
 
     Optional: 
-        cm                                  Global inwards crop to create a margin ("crop margin"). Default 0px
-        interpolation_factor                Factor to use for interpolation != 0. Default None implies no interpolation
-        interpolation_method                Interpolation method to use. Default bicubic interpolation
+        cm                                  Global inwards crop to create a margin ("crop margin"). Default 5px
 
     Returns:
-        output_path                         path to saved image focus with has as filename
+        scan_window                         The found scan window of the frame
 
     Raises:
         IOError: in case of any errors with OpenCV or file operations 
-
     """
     try:
 
@@ -190,15 +177,35 @@ def select_save_frame_tumor_roi(
         # Crop the image to the bounding rectangle
         # As conservative measure crop inwards 3 pixels to guarantee no boundary
         scan_window = scan_window[y + cm: y + h - cm,   x + cm: x + w - cm] 
- 
-           # Interpolate (upscale/downscale) the found segment if an interpolation factor is passed
-        if interpolation_factor is not None:
-            scan_window = cv2.resize(
-                scan_window, 
-                None, 
-                fx=interpolation_factor, 
-                fy=interpolation_factor, 
-                interpolation=interpolation_method)
+
+        return scan_window
+
+    except Exception as exception:
+        raise IOError("Error isolating and saving image focus")
+
+
+def load_select_save_scan_window(
+    path_to_image, 
+    path_to_output_directory, 
+    cm=0):
+    """
+    Load, Select, and Save the scan window of a grayscale ultrasound frame
+
+    Arguments:
+        path_to_image                       Path to input image file
+        path_to_output_directory            Path to output directory 
+
+    Optional: 
+        cm                                  Global inwards crop to create a margin ("crop margin"). Default 0px
+
+    Returns:
+        output_path                         Path to saved scan window
+
+    Raises:
+        IOError: in case of any errors with OpenCV or file operations 
+    """
+    try:
+        scan_window = load_select_scan_window(path_to_image, cm)
 
         output_path = "{0}/{1}.png".format(path_to_output_directory, uuid.uuid4())
 
