@@ -124,7 +124,7 @@ def center_crop_to_target_pixel_boundary(image, height_pixel_boundary, width_pix
         greater than 0. Else, returns the original image without cropping.
         Additionally, returns the cropping bounds as a tuple. 
     """
-    if height_pixel_boundary < 0 or width_pixel_boundary< 0:
+    if height_pixel_boundary < 0 or width_pixel_boundary < 0:
         return image
 
     is_multi_channel = len(image.shape) == 3
