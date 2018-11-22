@@ -1,0 +1,3 @@
+_graphics/* linguist-vendored
+_notebooks/* linguist-vendored
+README.md linguist-documentation=true
