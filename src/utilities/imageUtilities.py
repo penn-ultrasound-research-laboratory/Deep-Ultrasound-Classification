@@ -46,7 +46,7 @@ def determine_image_type(bgr_image, color_percentage_threshold=0.04):
 
 
 def origin_crop_to_target_shape(image, target_shape, origin):
-    """Crop the center portion of an image to a target shape
+    """Best effort to crop an image to a target shape from fixed origin
 
     Arguments:
         image                               An image. Either single channel (grayscale) or multi-channel (color)
@@ -63,20 +63,13 @@ def origin_crop_to_target_shape(image, target_shape, origin):
     target_shape = extract_height_width(target_shape)
         
     if not crop_in_bounds(native_shape, target_shape, origin):
-        return image
-
-    crop = image[
-        origin[0]: origin[0] + target_shape[0],
-        origin[1]: origin[1] + target_shape[1]
-    ]
-
-    crop_description = origin + target_shape
-
-    return crop, crop_description
+        return ((0, 0) + target_shape)
+    
+    return (origin + target_shape)
 
 
 def center_crop_to_target_shape(image, target_shape):
-    """Crop the center portion of an image to a target shape
+    """Best effort to crop an image to a target shape from center origin
 
     Arguments:
         image                               An image. Either single channel (grayscale) or multi-channel (color)
@@ -92,16 +85,9 @@ def center_crop_to_target_shape(image, target_shape):
     offset = np.subtract(native_shape, target_shape) // 2
         
     if not crop_in_bounds(image.shape, target_shape, offset):
-        return image
+        return ((0, 0) + target_shape)
 
-    crop = image[
-        offset[0]: offset[0] + target_shape[0],
-        offset[1]: offset[1] + target_shape[1]
-    ]
-
-    crop_description = offset + target_shape
-
-    return crop, crop_description
+    return (offset + target_shape)
 
 
 def center_crop_to_target_percentage(image, height_fraction, width_fraction):
