@@ -7,6 +7,14 @@ from src.constants.ultrasoundConstants import IMAGE_TYPE
 from matplotlib import pyplot
 
 
+def extract_height_width(image_shape):
+    return image_shape[:2]
+
+
+def crop_in_bounds(native_shape, target_shape, target_offset):
+    return all(np.add(target_shape, target_offset) <= native_shape)
+
+
 def determine_image_type(bgr_image, color_percentage_threshold=0.04):
     """Determines image type (Grayscale/Color) of image
 
@@ -38,7 +46,7 @@ def center_crop_to_target_shape(image, target_shape, origin=None):
 
     Arguments:
         image                               An image. Either single channel (grayscale) or multi-channel (color)
-        target_shape                        Target shape of the image section to crop
+        target_shape                        Target shape of the image section to crop (height, width)
 
     Optional:
         origin                              Tuple containing hardcoded origin (row_offset, column_offset). The "origin"
@@ -51,25 +59,22 @@ def center_crop_to_target_shape(image, target_shape, origin=None):
 
     https://stackoverflow.com/questions/39382412/crop-center-portion-of-a-numpy-image
     """
-    is_multi_channel = len(image.shape) == 3
+    native_shape = extract_height_width(image.shape)
+    target_shape = extract_height_width(target_shape)
 
-    original_height, original_width = image.shape[:2] if is_multi_channel else image.shape
-    target_height, target_width = target_shape[:2] if is_multi_channel else target_shape
-
-    if target_width > original_width or target_height > original_height:
+    offset = origin if origin is not None else np.subtract(native_shape, target_shape) // 2
+        
+    if not crop_in_bounds(image.shape, target_shape, offset):
         return image
 
-    column_offset = (
-        (original_width // 2) - (target_width // 2) if origin is None
-        else origin[1])
-        
-    row_offset = (
-        (original_height // 2) - (target_height // 2) if origin is None 
-        else origin[0])
-   
-    return image[
-        row_offset: row_offset + target_height,
-        column_offset: column_offset + target_width]
+    crop = image[
+        offset[0]: offset[0] + target_shape[0],
+        offset[1]: offset[1] + target_shape[1]
+    ]
+
+    crop_description = offset + target_shape
+
+    return crop, crop_description
 
 
 def center_crop_to_target_percentage(image, height_fraction, width_fraction):
@@ -91,7 +96,8 @@ def center_crop_to_target_percentage(image, height_fraction, width_fraction):
 
     is_multi_channel = len(image.shape) == 3
 
-    original_height, original_width = image.shape[:2] if is_multi_channel else image.shape
+    original_height, original_width = image.shape[:
+                                                  2] if is_multi_channel else image.shape
 
     height_divisor = 1 / height_fraction
     width_divisor = 1 / width_fraction
@@ -104,7 +110,8 @@ def center_crop_to_target_percentage(image, height_fraction, width_fraction):
     left_crop = int(width_remainder // 2)
     right_crop = int(width_remainder - left_crop)
 
-    cropped_slice = image[top_crop: original_height - bottom_crop, left_crop: original_width - right_crop]
+    cropped_slice = image[top_crop: original_height -
+                          bottom_crop, left_crop: original_width - right_crop]
     cropping_bounds = (top_crop, bottom_crop, left_crop, right_crop)
 
     return cropped_slice, cropping_bounds
@@ -129,7 +136,8 @@ def center_crop_to_target_pixel_boundary(image, height_pixel_boundary, width_pix
 
     is_multi_channel = len(image.shape) == 3
 
-    original_height, original_width = image.shape[:2] if is_multi_channel else image.shape
+    original_height, original_width = image.shape[:
+                                                  2] if is_multi_channel else image.shape
 
     cropped_slice = image[
         height_pixel_boundary: original_height - height_pixel_boundary,
@@ -146,13 +154,13 @@ def center_crop_to_target_pixel_boundary(image, height_pixel_boundary, width_pix
 
 
 def image_random_sampling_batch(
-    image, 
-    target_shape = None, 
-    batch_size = 16,
-    use_min_dimension = False,
-    upscale_to_target = False,
-    upscale_method = cv2.INTER_CUBIC,
-    always_sample_center=False):
+        image,
+        target_shape=None,
+        batch_size=16,
+        use_min_dimension=False,
+        upscale_to_target=False,
+        upscale_method=cv2.INTER_CUBIC,
+        always_sample_center=False):
     """Randomly sample an image to produce sample batch 
 
     Arguments:
@@ -165,10 +173,10 @@ def image_random_sampling_batch(
         use_min_dimension                    Boolean indicating to use the minimum shape dimension as the cropping
                                                  dimension. Must be True if target_shape is None. Will override 
                                                  target_shape regardless of shape value.
-        
+
         upscale_to_target                    Upscale the image so that image dimensions >= target_shape before sampling
                                                 target_shape must be defined to use upscale_to_target
-        
+
         upscale_method                       Interpolation method to used. Default cv2.INTER_CUBIC
 
     Returns:
@@ -178,34 +186,37 @@ def image_random_sampling_batch(
         ValueError: the target_shape is greater than the actual image shape in at least one dimension
     """
     try:
-        
+
         if target_shape is None:
             if use_min_dimension is False:
-                raise ValueError("Use minimum dimension must be True with no target shape specified")
+                raise ValueError(
+                    "Use minimum dimension must be True with no target shape specified")
             if upscale_to_target:
-                raise TypeError("If upscale_to_target is True, target_shape must be defined")
+                raise TypeError(
+                    "If upscale_to_target is True, target_shape must be defined")
         else:
             if target_shape[0] != target_shape[1]:
-                raise ValueError("Target Shape must be a square. E.g. [200, 200]")
+                raise ValueError(
+                    "Target Shape must be a square. E.g. [200, 200]")
 
             # TODO: should raise an error if upscale_to_target is False and the passed in image is smaller
             # in any dimension than the target shape
 
         if upscale_to_target:
             minimum_dimension = np.min(image.shape[:2])
-            # Increase upscale ratio marginally to 
-            # Assumption is to do a square upscale (fx=fy). The behavior of non-square interpolation is odd. 
+            # Increase upscale ratio marginally to
+            # Assumption is to do a square upscale (fx=fy). The behavior of non-square interpolation is odd.
             upscale_ratio = (target_shape[0] / minimum_dimension) * 1.02
             image = cv2.resize(
-                image, 
-                None, 
-                fx=upscale_ratio, 
-                fy=upscale_ratio, 
+                image,
+                None,
+                fx=upscale_ratio,
+                fy=upscale_ratio,
                 interpolation=upscale_method)
         else:
             # Use the minimum dimension if any dimension of image shape is less than the target shape
             if use_min_dimension is True or (
-                target_shape is not None and np.min(target_shape) > np.min(image.shape[:2])):
+                    target_shape is not None and np.min(target_shape) > np.min(image.shape[:2])):
                 minimum_dimension = np.min(image.shape[:2])
                 target_shape = np.array([minimum_dimension, minimum_dimension])
 
@@ -213,10 +224,10 @@ def image_random_sampling_batch(
         row_origin_max = image.shape[0] - target_shape[0]
         column_origin_max = image.shape[1] - target_shape[1]
 
-        # If always_sample_center - always pull the same center cropped image to form the batch. 
-        # Option likely used in conjunction with image data generator that will randomly transform 
+        # If always_sample_center - always pull the same center cropped image to form the batch.
+        # Option likely used in conjunction with image data generator that will randomly transform
         # samples of the image bath. Otherwise, randomly sample origins from origin range
-        
+
         if always_sample_center:
             row_origins = [row_origin_max // 2] * batch_size
             column_origins = [column_origin_max // 2] * batch_size
@@ -230,12 +241,13 @@ def image_random_sampling_batch(
                 np.random.randint(0, column_origin_max, batch_size) if column_origin_max > 0
                 else [0] * batch_size)
 
+        # THIS IS NOW INCORRECT...
         return np.stack(map(lambda sample_index: center_crop_to_target_shape(
             image,
             target_shape,
             origin=(row_origins[sample_index], column_origins[sample_index])),
             range(batch_size)), axis=0)
-    
+
     except ValueError as e:
         raise ValueError(e)
 
@@ -245,22 +257,22 @@ def image_random_sampling_batch(
 
 if __name__ == "__main__":
 
-    batch_size=5
+    batch_size = 5
     elephant = cv2.imread("../TestImages/poorlyFocused.png", cv2.IMREAD_COLOR)
 
     random_batch = image_random_sampling_batch(
-        elephant, 
+        elephant,
         target_shape=[220, 220],
         upscale_to_target=True,
         batch_size=batch_size,
         always_sample_center=True)
-    
+
     for i in range(batch_size):
         cv2.imshow("mini", random_batch[i])
         cv2.waitKey(0)
 
     random_batch_max = image_random_sampling_batch(
-        elephant, 
+        elephant,
         use_min_dimension=True,
         batch_size=batch_size)
 
