@@ -15,6 +15,10 @@ def crop_in_bounds(native_shape, target_shape, target_offset):
     return all(np.add(target_shape, target_offset) <= native_shape)
 
 
+def apply_crop(image, crop):
+    return image[crop[0]: crop[0] + crop[2], crop[1]: crop[1] + crop[3]]
+
+
 def determine_image_type(bgr_image, color_percentage_threshold=0.04):
     """Determines image type (Grayscale/Color) of image
 
@@ -25,12 +29,12 @@ def determine_image_type(bgr_image, color_percentage_threshold=0.04):
         IMAGE_TYPE Enum object. Specifies either IMAGE_TYPE.GRAYSCALE of IMAGE_TYPE.COLOR
 
     Note:
-        0.04 is an empirically determined constant. When we convert MOV -> MP4 --> PNG frames, 
-        there is a small probability that a grayscale frame has some color bleeding. That is, a tiny segment of the 
+        0.04 is an empirically determined constant. When we convert MOV -> MP4 --> PNG frames,
+        there is a small probability that a grayscale frame has some color bleeding. That is, a tiny segment of the
         pixels will take on a grayish/brown tint. Empirically, this gave ~0.02-0.04 color percentage to the full image.
         We were basically getting false attribution of GRAYSCALE images to the COLOR image type enum because the
-        threshold of 0.015 was too low. Increased to 0.04. Hopefully shouldn't create false attribution. 
-        The color scale bar in true COLOR scans all but guarantees a percentage greater than 10%. 
+        threshold of 0.015 was too low. Increased to 0.04. Hopefully shouldn't create false attribution.
+        The color scale bar in true COLOR scans all but guarantees a percentage greater than 10%.
     """
     b, g, r = cv2.split(bgr_image)
     equality_check = np.logical_and(np.logical_and(b == r, b == g), r == g)
@@ -41,28 +45,51 @@ def determine_image_type(bgr_image, color_percentage_threshold=0.04):
         return IMAGE_TYPE.COLOR
 
 
-def center_crop_to_target_shape(image, target_shape, origin=None):
+def origin_crop_to_target_shape(image, target_shape, origin):
     """Crop the center portion of an image to a target shape
 
     Arguments:
         image                               An image. Either single channel (grayscale) or multi-channel (color)
         target_shape                        Target shape of the image section to crop (height, width)
 
-    Optional:
         origin                              Tuple containing hardcoded origin (row_offset, column_offset). The "origin"
-                                                is the upper-left corner of the cropped image relative to 
+                                                is the upper-left corner of the cropped image relative to
                                                 the top left at (0,0).
     Returns:
-        A cropped image if both the target width and target height are
-        less than the actual width and actual height. 
+        A cropped image if both the target width and target height are less than the actual width and actual height.
         Else, returns the original image without cropping.
+    """
+    native_shape = extract_height_width(image.shape)
+    target_shape = extract_height_width(target_shape)
+        
+    if not crop_in_bounds(native_shape, target_shape, origin):
+        return image
 
-    https://stackoverflow.com/questions/39382412/crop-center-portion-of-a-numpy-image
+    crop = image[
+        origin[0]: origin[0] + target_shape[0],
+        origin[1]: origin[1] + target_shape[1]
+    ]
+
+    crop_description = origin + target_shape
+
+    return crop, crop_description
+
+
+def center_crop_to_target_shape(image, target_shape):
+    """Crop the center portion of an image to a target shape
+
+    Arguments:
+        image                               An image. Either single channel (grayscale) or multi-channel (color)
+        target_shape                        Target shape of the image section to crop (height, width)
+
+    Returns:
+        A cropped image if both the target width and target height are less than the actual width and actual height. 
+        Else, returns the original image without cropping.
     """
     native_shape = extract_height_width(image.shape)
     target_shape = extract_height_width(target_shape)
 
-    offset = origin if origin is not None else np.subtract(native_shape, target_shape) // 2
+    offset = np.subtract(native_shape, target_shape) // 2
         
     if not crop_in_bounds(image.shape, target_shape, offset):
         return image
@@ -136,8 +163,7 @@ def center_crop_to_target_pixel_boundary(image, height_pixel_boundary, width_pix
 
     is_multi_channel = len(image.shape) == 3
 
-    original_height, original_width = image.shape[:
-                                                  2] if is_multi_channel else image.shape
+    original_height, original_width = image.shape[:2] if is_multi_channel else image.shape
 
     cropped_slice = image[
         height_pixel_boundary: original_height - height_pixel_boundary,
