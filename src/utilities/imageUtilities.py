@@ -63,7 +63,7 @@ def origin_crop_to_target_shape(image, target_shape, origin):
     target_shape = extract_height_width(target_shape)
         
     if not crop_in_bounds(native_shape, target_shape, origin):
-        return ((0, 0) + target_shape)
+        return ((0, 0) + image.shape)
     
     return (origin + target_shape)
 
@@ -85,7 +85,7 @@ def center_crop_to_target_shape(image, target_shape):
     offset = np.subtract(native_shape, target_shape) // 2
         
     if not crop_in_bounds(image.shape, target_shape, offset):
-        return ((0, 0) + target_shape)
+        return ((0, 0) + image.shape)
 
     return (offset + target_shape)
 
@@ -104,30 +104,16 @@ def center_crop_to_target_percentage(image, height_fraction, width_fraction):
         less than or equal to 1. Else, returns the original image without cropping.
         Additionally, returns the cropping bounds as a tuple. 
     """
+    native_shape = extract_height_width(image.shape)
+    
     if height_fraction <= 0 or height_fraction > 1 or width_fraction <= 0 or width_fraction > 1:
-        return image
+        return ((0, 0) + image.shape)
 
-    is_multi_channel = len(image.shape) == 3
+    divisors = np.reciprocal((height_fraction, width_fraction))
+    target_shape = np.floor_divide(native_shape, divisors)
+    offset = np.subtract(native_shape, target_shape) // 2     
 
-    original_height, original_width = image.shape[:
-                                                  2] if is_multi_channel else image.shape
-
-    height_divisor = 1 / height_fraction
-    width_divisor = 1 / width_fraction
-
-    height_remainder = original_height - (original_height // height_divisor)
-    width_remainder = original_width - (original_width // width_divisor)
-
-    top_crop = int(height_remainder // 2)
-    bottom_crop = int(height_divisor - top_crop)
-    left_crop = int(width_remainder // 2)
-    right_crop = int(width_remainder - left_crop)
-
-    cropped_slice = image[top_crop: original_height -
-                          bottom_crop, left_crop: original_width - right_crop]
-    cropping_bounds = (top_crop, bottom_crop, left_crop, right_crop)
-
-    return cropped_slice, cropping_bounds
+    return (offset + target_shape)
 
 
 def center_crop_to_target_pixel_boundary(image, height_pixel_boundary, width_pixel_boundary):
