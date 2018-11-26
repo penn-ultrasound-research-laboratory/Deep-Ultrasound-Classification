@@ -121,7 +121,7 @@ class Test_TestCenterCropToTargetPercentage(unittest.TestCase):
         mock_image = np.zeros(IMAGE_SHAPE)
         self.assertEqual(
             util.center_crop_to_target_percentage(mock_image, HEIGHT_FRACTION, WIDTH_FRACTION),
-            ((25, 40) + (450, 320))
+            ((25, 40) + (449, 320))
         )
 
     def test_reject_crop_greater_than_one_fraction(self):
@@ -134,7 +134,7 @@ class Test_TestCenterCropToTargetPercentage(unittest.TestCase):
             ((0, 0) + IMAGE_SHAPE)
         )
     
-    def test_reject_crop_greater_leq_zero(self):
+    def test_reject_crop_greater_leq_zero_fraction(self):
         IMAGE_SHAPE = (500, 400)
         HEIGHT_FRACTION = 0.90
         WIDTH_FRACTION = 0.0
@@ -143,6 +143,39 @@ class Test_TestCenterCropToTargetPercentage(unittest.TestCase):
             util.center_crop_to_target_percentage(mock_image, HEIGHT_FRACTION, WIDTH_FRACTION),
             ((0, 0) + IMAGE_SHAPE)
         )
+
+
+class Test_TestCenterCropToTargetPadding(unittest.TestCase):
+    def test_successful_crop_center_padding(self):
+        IMAGE_SHAPE = (500, 400, 3)
+        HEIGHT_PADDING = 10
+        WIDTH_PADDING = 50
+        mock_image = np.zeros(IMAGE_SHAPE)
+        self.assertEqual(
+            util.center_crop_to_target_padding(mock_image, HEIGHT_PADDING, WIDTH_PADDING),
+            ((HEIGHT_PADDING, WIDTH_PADDING) + (480, 300))
+        )
+
+    def test_reject_crop_greater_leq_zero_padding(self):
+        IMAGE_SHAPE = (500, 400)
+        HEIGHT_PADDING = 3
+        WIDTH_PADDING = -1
+        mock_image = np.zeros(IMAGE_SHAPE)
+        self.assertEqual(
+            util.center_crop_to_target_padding(mock_image, HEIGHT_PADDING, WIDTH_PADDING),
+            ((0, 0) + IMAGE_SHAPE)
+        )
+
+    def test_reject_crop_greater_than_half_boundary(self):
+        IMAGE_SHAPE = (500, 400)
+        HEIGHT_PADDING = 250
+        WIDTH_PADDING = 10
+        mock_image = np.zeros(IMAGE_SHAPE)
+        self.assertEqual(
+            util.center_crop_to_target_padding(mock_image, HEIGHT_PADDING, WIDTH_PADDING),
+            ((0, 0) + IMAGE_SHAPE)
+        )
+    
 
 if __name__ == '__main__':
     unittest.main()

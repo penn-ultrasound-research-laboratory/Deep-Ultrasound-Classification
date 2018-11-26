@@ -63,7 +63,7 @@ def origin_crop_to_target_shape(image, target_shape, origin):
     target_shape = extract_height_width(target_shape)
         
     if not crop_in_bounds(native_shape, target_shape, origin):
-        return ((0, 0) + image.shape)
+        return ((0, 0) + native_shape)
     
     return (origin + target_shape)
 
@@ -82,10 +82,10 @@ def center_crop_to_target_shape(image, target_shape):
     native_shape = extract_height_width(image.shape)
     target_shape = extract_height_width(target_shape)
 
-    offset = np.subtract(native_shape, target_shape) // 2
+    offset = tuple(np.subtract(native_shape, target_shape) // 2)
         
-    if not crop_in_bounds(image.shape, target_shape, offset):
-        return ((0, 0) + image.shape)
+    if not crop_in_bounds(native_shape, target_shape, offset):
+        return ((0, 0) + native_shape)
 
     return (offset + target_shape)
 
@@ -107,48 +107,38 @@ def center_crop_to_target_percentage(image, height_fraction, width_fraction):
     native_shape = extract_height_width(image.shape)
     
     if height_fraction <= 0 or height_fraction > 1 or width_fraction <= 0 or width_fraction > 1:
-        return ((0, 0) + image.shape)
+        return ((0, 0) + native_shape)
 
     divisors = np.reciprocal((height_fraction, width_fraction))
-    target_shape = np.floor_divide(native_shape, divisors)
-    offset = np.subtract(native_shape, target_shape) // 2     
+    target_shape = tuple(np.floor_divide(native_shape, divisors))
+    offset = tuple(np.subtract(native_shape, target_shape) // 2)     
 
     return (offset + target_shape)
 
 
-def center_crop_to_target_pixel_boundary(image, height_pixel_boundary, width_pixel_boundary):
+def center_crop_to_target_padding(image, height_padding, width_padding):
     """Crop the center portion of an image to a target shape
 
     Arguments:
         image                               An image. Either single channel (grayscale) or multi-channel (color)
-        height_pixel_boundary               Target height pixel boundary of the image to crop. arg > 0 
+        height_padding               Target height pixel boundary of the image to crop. arg > 0 
                                                 (e.g. 3 for 3px)
-        width_pixel_boundary                Target width pixel boundary of the image to crop. arg > 0
+        width_padding                Target width pixel boundary of the image to crop. arg > 0
                                                 (e.g. 3 for 3px)
     Returns:
         A cropped image if both the target width and target height are
         greater than 0. Else, returns the original image without cropping.
         Additionally, returns the cropping bounds as a tuple. 
     """
-    if height_pixel_boundary < 0 or width_pixel_boundary < 0:
-        return image
+    native_shape = extract_height_width(image.shape)
+    offset = (height_padding, width_padding)
 
-    is_multi_channel = len(image.shape) == 3
+    if height_padding < 0 or width_padding < 0 or any(offset >= np.floor_divide(native_shape, 2)):
+        return ((0, 0) + native_shape)
 
-    original_height, original_width = image.shape[:2] if is_multi_channel else image.shape
-
-    cropped_slice = image[
-        height_pixel_boundary: original_height - height_pixel_boundary,
-        width_pixel_boundary: original_width - width_pixel_boundary
-    ]
-
-    cropping_bounds = (
-        height_pixel_boundary,
-        height_pixel_boundary,
-        width_pixel_boundary,
-        width_pixel_boundary)
-
-    return cropped_slice, cropping_bounds
+    target_shape = tuple(np.subtract(native_shape, np.multiply(offset, 2)))
+    
+    return (offset + target_shape)
 
 
 def image_random_sampling_batch(
