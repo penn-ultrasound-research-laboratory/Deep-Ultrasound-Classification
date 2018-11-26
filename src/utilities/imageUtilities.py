@@ -15,8 +15,11 @@ def crop_in_bounds(native_shape, target_shape, target_offset):
     return all(np.add(target_shape, target_offset) <= native_shape)
 
 
-def apply_crop(image, crop):
-    return image[crop[0]: crop[0] + crop[2], crop[1]: crop[1] + crop[3]]
+def apply_crop(image, crop_description):
+    return image[
+        crop_description[0]: crop_description[0] + crop_description[2],
+        crop_description[1]: crop_description[1] + crop_description[3]
+    ]
 
 
 def determine_image_type(bgr_image, color_percentage_threshold=0.04):
@@ -56,15 +59,14 @@ def origin_crop_to_target_shape(image, target_shape, origin):
                                                 is the upper-left corner of the cropped image relative to
                                                 the top left at (0,0).
     Returns:
-        A cropped image if both the target width and target height are less than the actual width and actual height.
-        Else, returns the original image without cropping.
+        A crop description
     """
     native_shape = extract_height_width(image.shape)
     target_shape = extract_height_width(target_shape)
-        
+
     if not crop_in_bounds(native_shape, target_shape, origin):
         return ((0, 0) + native_shape)
-    
+
     return (origin + target_shape)
 
 
@@ -76,14 +78,13 @@ def center_crop_to_target_shape(image, target_shape):
         target_shape                        Target shape of the image section to crop (height, width)
 
     Returns:
-        A cropped image if both the target width and target height are less than the actual width and actual height. 
-        Else, returns the original image without cropping.
+        A crop description
     """
     native_shape = extract_height_width(image.shape)
     target_shape = extract_height_width(target_shape)
 
     offset = tuple(np.subtract(native_shape, target_shape) // 2)
-        
+
     if not crop_in_bounds(native_shape, target_shape, offset):
         return ((0, 0) + native_shape)
 
@@ -91,7 +92,7 @@ def center_crop_to_target_shape(image, target_shape):
 
 
 def center_crop_to_target_percentage(image, height_fraction, width_fraction):
-    """Crop the center portion of an image to a target shape
+    """Crop the center portion of an image to a target percentage
 
     Arguments:
         image                               An image. Either single channel (grayscale) or multi-channel (color)
@@ -100,35 +101,30 @@ def center_crop_to_target_percentage(image, height_fraction, width_fraction):
         width_fraction                      Target width fraction of the image to crop. 0 > arg >= 1
                                                 (e.g. 0.95 for 95%)
     Returns:
-        A cropped image if both the target width and target height are
-        less than or equal to 1. Else, returns the original image without cropping.
-        Additionally, returns the cropping bounds as a tuple. 
+        A crop description
     """
     native_shape = extract_height_width(image.shape)
-    
+
     if height_fraction <= 0 or height_fraction > 1 or width_fraction <= 0 or width_fraction > 1:
         return ((0, 0) + native_shape)
 
     divisors = np.reciprocal((height_fraction, width_fraction))
     target_shape = tuple(np.floor_divide(native_shape, divisors))
-    offset = tuple(np.subtract(native_shape, target_shape) // 2)     
+    offset = tuple(np.subtract(native_shape, target_shape) // 2)
 
     return (offset + target_shape)
 
 
 def center_crop_to_target_padding(image, height_padding, width_padding):
-    """Crop the center portion of an image to a target shape
+    """Crop the center portion of an image to a target boundary padding
 
     Arguments:
         image                               An image. Either single channel (grayscale) or multi-channel (color)
-        height_padding               Target height pixel boundary of the image to crop. arg > 0 
-                                                (e.g. 3 for 3px)
-        width_padding                Target width pixel boundary of the image to crop. arg > 0
-                                                (e.g. 3 for 3px)
+        height_padding                      Target height padding of the image to crop. (e.g. 3 for 3px)
+        width_padding                       Target width pixel boundary of the image to crop. (e.g. 3 for 3px)
+
     Returns:
-        A cropped image if both the target width and target height are
-        greater than 0. Else, returns the original image without cropping.
-        Additionally, returns the cropping bounds as a tuple. 
+        A crop description
     """
     native_shape = extract_height_width(image.shape)
     offset = (height_padding, width_padding)
@@ -137,7 +133,7 @@ def center_crop_to_target_padding(image, height_padding, width_padding):
         return ((0, 0) + native_shape)
 
     target_shape = tuple(np.subtract(native_shape, np.multiply(offset, 2)))
-    
+
     return (offset + target_shape)
 
 
@@ -174,7 +170,6 @@ def image_random_sampling_batch(
         ValueError: the target_shape is greater than the actual image shape in at least one dimension
     """
     try:
-
         if target_shape is None:
             if use_min_dimension is False:
                 raise ValueError(
@@ -190,11 +185,13 @@ def image_random_sampling_batch(
             # TODO: should raise an error if upscale_to_target is False and the passed in image is smaller
             # in any dimension than the target shape
 
+        native_shape = extract_height_width(image.shape)
+        native_min_dim = np.min(native_shape)
+
         if upscale_to_target:
-            minimum_dimension = np.min(image.shape[:2])
             # Increase upscale ratio marginally to
             # Assumption is to do a square upscale (fx=fy). The behavior of non-square interpolation is odd.
-            upscale_ratio = (target_shape[0] / minimum_dimension) * 1.02
+            upscale_ratio = (target_shape[0] / native_min_dim) * 1.02
             image = cv2.resize(
                 image,
                 None,
@@ -204,37 +201,31 @@ def image_random_sampling_batch(
         else:
             # Use the minimum dimension if any dimension of image shape is less than the target shape
             if use_min_dimension is True or (
-                    target_shape is not None and np.min(target_shape) > np.min(image.shape[:2])):
-                minimum_dimension = np.min(image.shape[:2])
-                target_shape = np.array([minimum_dimension, minimum_dimension])
+                    target_shape is not None and np.min(target_shape) > native_min_dim):
+                target_shape = np.array([native_min_dim, native_min_dim])
 
-        # Compute valid origin range
-        row_origin_max = image.shape[0] - target_shape[0]
-        column_origin_max = image.shape[1] - target_shape[1]
+        # Compute valid origin range. Fallback is "1" to support exclusive randint
+        row_origin_max = max(image.shape[0] - target_shape[0], 1)
+        column_origin_max = max(image.shape[1] - target_shape[1], 1)
 
         # If always_sample_center - always pull the same center cropped image to form the batch.
         # Option likely used in conjunction with image data generator that will randomly transform
         # samples of the image bath. Otherwise, randomly sample origins from origin range
 
         if always_sample_center:
-            row_origins = [row_origin_max // 2] * batch_size
-            column_origins = [column_origin_max // 2] * batch_size
-
+            # Generate crop descriptions for center crop
+            crop_descriptions = [center_crop_to_target_shape(image, target_shape)] * batch_size
         else:
-            row_origins = (
-                np.random.randint(0, row_origin_max, batch_size) if row_origin_max > 0
-                else [0] * batch_size)
+            # Generate list of origins for image samples
+            row_origins = np.random.randint(0, row_origin_max, batch_size)
+            column_origins = np.random.randint(0, column_origin_max, batch_size)
+            origins = zip(row_origins, column_origins)
+            # Generate crop descriptions from list of origins
+            crop_descriptions = [origin_crop_to_target_shape(image, target_shape, o) for o in origins]
 
-            column_origins = (
-                np.random.randint(0, column_origin_max, batch_size) if column_origin_max > 0
-                else [0] * batch_size)
-
-        # THIS IS NOW INCORRECT...
-        return np.stack(map(lambda sample_index: center_crop_to_target_shape(
-            image,
-            target_shape,
-            origin=(row_origins[sample_index], column_origins[sample_index])),
-            range(batch_size)), axis=0)
+        return np.stack(
+            map(lambda idx: apply_crop(image, crop_descriptions[idx])),
+            axis=0)
 
     except ValueError as e:
         raise ValueError(e)
