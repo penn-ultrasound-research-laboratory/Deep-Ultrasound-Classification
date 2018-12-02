@@ -55,19 +55,19 @@ class Test_TestCropInBounds(unittest.TestCase):
             NATIVE_SHAPE, TARGET_SHAPE, OFFSET))
 
 
-class Test_TestApplyCrop(unittest.TestCase):
+class Test_TestApplySingleCrop(unittest.TestCase):
     def test_single_channel(self):
         CROP = (10, 10, 50, 40)
         _, _, CROP_HEIGHT, CROP_WIDTH = CROP
         mock_image = np.zeros((500, 400))
-        cropped_image = util.apply_crop(mock_image, CROP)
+        cropped_image = util.apply_single_crop(mock_image, CROP)
         self.assertEqual(cropped_image.shape, (CROP_HEIGHT, CROP_WIDTH))
 
     def test_three_channels(self):
         CROP = (10, 10, 50, 40)
         Y_OFFSET, X_OFFSET, CROP_HEIGHT, CROP_WIDTH = CROP
         mock_image = np.zeros((500, 400, 3))
-        cropped_image = util.apply_crop(mock_image, CROP)
+        cropped_image = util.apply_single_crop(mock_image, CROP)
         self.assertEqual(cropped_image.shape, (CROP_HEIGHT, CROP_WIDTH, 3))
 
 

@@ -15,19 +15,26 @@ def crop_in_bounds(native_shape, target_shape, target_offset=(0, 0)):
     return all(np.add(target_shape, target_offset) <= native_shape)
 
 
-def apply_crop(image, crop_description):
+def apply_single_crop(image, crop_description):
     return image[
         crop_description[0]: crop_description[0] + crop_description[2],
         crop_description[1]: crop_description[1] + crop_description[3]
     ]
 
 
-def apply_batch_crop(image, crop_descriptions):
-    return np.stack(map(lambda idx: apply_crop(image, crop_descriptions[idx])), axis=0)
+def apply_multiple_crops(image, crop_descriptions):
+    return np.stack(map(lambda idx: apply_single_crop(image, crop_descriptions[idx])), axis=0)
 
 
 def apply_image_upscale(image, y_upscale_factor, x_upscale_factor, interpolation_method=cv2.INTER_CUBIC):
     return cv2.resize(image, None, fx=x_upscale_factor, fy=y_upscale_factor, interpolation=interpolation_method)
+
+
+def uniform_upscale_to_target_shape(image, target_shape, safe_upscale_ratio=1.01):
+    native_shape = extract_height_width(image.shape)
+    target_shape = extract_height_width(target_shape)
+    upscale_ratio = max(np.divide(target_shape, native_shape)) * safe_upscale_ratio
+    return apply_image_upscale(image, upscale_ratio, upscale_ratio)
 
 
 def determine_image_type(bgr_image, color_percentage_threshold=0.04):
@@ -104,7 +111,7 @@ def center_crop_to_target_percentage(image, height_fraction, width_fraction):
 
     Arguments:
         image                               An image. Either single channel (grayscale) or multi-channel (color)
-        height_fraction                     Target height fraction of the image to crop. 0 > arg >= 1 
+        height_fraction                     Target height fraction of the image to crop. 0 > arg >= 1
                                                 (e.g. 0.95 for 95%)
         width_fraction                      Target width fraction of the image to crop. 0 > arg >= 1
                                                 (e.g. 0.95 for 95%)
@@ -145,15 +152,41 @@ def center_crop_to_target_padding(image, height_padding, width_padding):
     return (offset + target_shape)
 
 
-def image_random_sampling_batch(
+def sample_to_batch_center_origin(image, target_shape, batch_size):
+    crop_descriptions = [center_crop_to_target_shape(image, target_shape)] * batch_size
+    return apply_multiple_crops(image, crop_descriptions)
+
+
+def sample_to_batch_random_origin(image, target_shape, batch_size):
+    # Compute valid origin range. Fallback is "1" to support exclusive randint
+    row_origin_max = max(image.shape[0] - target_shape[0], 1)
+    column_origin_max = max(image.shape[1] - target_shape[1], 1)
+    # Generate list of origins for image samples
+    row_origins = np.random.randint(0, row_origin_max, batch_size)
+    column_origins = np.random.randint(0, column_origin_max, batch_size)
+    origins = zip(row_origins, column_origins)
+    # Generate crop descriptions from list of origins
+    crop_descriptions = [origin_crop_to_target_shape(image, target_shape, o) for o in origins]
+
+    return apply_multiple_crops(image, crop_descriptions)
+
+
+def sample_to_batch_target_shape(image, target_shape, batch_size, always_sample_center):
+    if always_sample_center:
+        return sample_to_batch_center_origin(image, target_shape, batch_size)
+    else:
+        return sample_to_batch_random_origin(image, target_shape, batch_size)
+
+
+def sample_to_batch(
         image,
-        target_shape=None,
         batch_size=16,
+        target_shape=None,
         use_min_dimension=False,
         upscale_to_target=False,
         interpolation_method=cv2.INTER_CUBIC,
         always_sample_center=False):
-    """Randomly sample an image to produce sample batch 
+    """Randomly sample an image to produce sample batch
 
     Arguments:
         image                                Image to sample in channels_last format
@@ -163,7 +196,7 @@ def image_random_sampling_batch(
         batch_size                           Number of sample to generate in image batch
 
         use_min_dimension                    Boolean indicating to use the minimum shape dimension as the cropping
-                                                 dimension. Must be True if target_shape is None. Will override 
+                                                 dimension. Must be True if target_shape is None. Will override
                                                  target_shape regardless of shape value.
 
         upscale_to_target                    Upscale the image so that image dimensions >= target_shape before sampling
@@ -172,70 +205,41 @@ def image_random_sampling_batch(
         interpolation_method                       Interpolation method to used. Default cv2.INTER_CUBIC
 
     Returns:
-        4D array containing sampled images in axis=0. 
+        4D array containing sampled images in axis=0.
 
-    Raises: 
+    Raises:
         ValueError: the target_shape is greater than the actual image shape in at least one dimension
     """
-    try:
-        if target_shape is None:
-            if use_min_dimension is False:
-                raise ValueError(
-                    "Use minimum dimension must be True with no target shape specified")
-            if upscale_to_target:
-                raise TypeError(
-                    "If upscale_to_target is True, target_shape must be defined")
-        else:
-            if target_shape[0] != target_shape[1]:
-                raise ValueError(
-                    "Target Shape must be a square. E.g. [200, 200]")
 
-            # TODO: should raise an error if upscale_to_target is False and the passed in image is smaller
-            # in any dimension than the target shape
+    native_shape = extract_height_width(image.shape)
+    target_shape = extract_height_width(target_shape)
+    native_min_dim = np.min(native_shape)
 
-        native_shape = extract_height_width(image.shape)
-        native_min_dim = np.min(native_shape)
+    if target_shape is None:
+        if not use_min_dimension:
+            return ValueError(
+                "Use minimum dimension must be True with no target shape specified")
+        elif upscale_to_target:
+            return TypeError(
+                "If upscale_to_target is True, target_shape must be defined")
+    else:
+        if (not upscale_to_target and any(np.subtract(target_shape, native_shape) < 0)):
+            raise ValueError(
+                "If upscale_to_target is False, every dimension in target_shape must be greater than native shape")
 
-        if upscale_to_target:
-            # Increase upscale ratio marginally to
-            # Assumption is to do a square upscale (fx=fy). The behavior of non-square interpolation is odd.
-            upscale_ratio = (target_shape[0] / native_min_dim) * 1.02
-            image = apply_image_upscale(image, upscale_ratio, upscale_ratio)
+    # THIS IS NOT YET UNIT-TESTED
+    if upscale_to_target:
+        image = uniform_upscale_to_target_shape(image, target_shape)
 
-        # Use the minimum dimension if any dimension of image shape is less than the target shape
-        if use_min_dimension is True or (
-                target_shape is not None and np.min(target_shape) > native_min_dim):
-            target_shape = np.array([native_min_dim, native_min_dim])
+    # Use the minimum dimension if any dimension of image shape is less than the target shape
+    if use_min_dimension:
+        target_shape = np.array([native_min_dim, native_min_dim])
 
-        # If always_sample_center - always pull the same center cropped image to form the batch.
-        # Option likely used in conjunction with image data generator that will randomly transform
-        # samples of the image bath. Otherwise, randomly sample origins from origin range
+    if (target_shape is not None and (np.min(target_shape) > native_min_dim)):
+        target_shape = np.array([native_min_dim, native_min_dim])
+        
+    return sample_to_batch_target_shape(image, target_shape, batch_size, always_sample_center)
 
-        if always_sample_center:
-            # Generate crop descriptions for center crop
-            crop_descriptions = [center_crop_to_target_shape(image, target_shape)] * batch_size
-        else:
-            # Compute valid origin range. Fallback is "1" to support exclusive randint
-            row_origin_max = max(image.shape[0] - target_shape[0], 1)
-            column_origin_max = max(image.shape[1] - target_shape[1], 1)
-
-
-            # Generate list of origins for image samples
-            row_origins = np.random.randint(0, row_origin_max, batch_size)
-            column_origins = np.random.randint(
-                0, column_origin_max, batch_size)
-            origins = zip(row_origins, column_origins)
-            # Generate crop descriptions from list of origins
-            crop_descriptions = [origin_crop_to_target_shape(
-                image, target_shape, o) for o in origins]
-
-        return apply_batch_crop(image, crop_descriptions)
-
-    except ValueError as e:
-        raise ValueError(e)
-
-    except TypeError as e:
-        raise TypeError(e)
 
 
 if __name__ == "__main__":
