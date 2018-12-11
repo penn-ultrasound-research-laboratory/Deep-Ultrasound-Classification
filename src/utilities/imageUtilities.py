@@ -8,7 +8,7 @@ from matplotlib import pyplot
 
 
 def extract_height_width(image_shape):
-    return image_shape[:2]
+    return tuple(image_shape[:2])
 
 
 def crop_in_bounds(native_shape, target_shape, target_offset=(0, 0)):
@@ -23,7 +23,7 @@ def apply_single_crop(image, crop_description):
 
 
 def apply_multiple_crops(image, crop_descriptions):
-    return np.stack(map(lambda idx: apply_single_crop(image, crop_descriptions[idx])), axis=0)
+    return np.stack(map(lambda crop: apply_single_crop(image, crop), crop_descriptions), axis=0)
 
 
 def apply_image_upscale(image, y_upscale_factor, x_upscale_factor, interpolation_method=cv2.INTER_CUBIC):
@@ -161,21 +161,16 @@ def sample_to_batch_random_origin(image, target_shape, batch_size):
     # Compute valid origin range. Fallback is "1" to support exclusive randint
     row_origin_max = max(image.shape[0] - target_shape[0], 1)
     column_origin_max = max(image.shape[1] - target_shape[1], 1)
+
     # Generate list of origins for image samples
     row_origins = np.random.randint(0, row_origin_max, batch_size)
     column_origins = np.random.randint(0, column_origin_max, batch_size)
     origins = zip(row_origins, column_origins)
+
     # Generate crop descriptions from list of origins
-    crop_descriptions = [origin_crop_to_target_shape(image, target_shape, o) for o in origins]
+    crop_descriptions = [origin_crop_to_target_shape(image, target_shape, ox) for ox in origins]
 
     return apply_multiple_crops(image, crop_descriptions)
-
-
-def sample_to_batch_target_shape(image, target_shape, batch_size, always_sample_center):
-    if always_sample_center:
-        return sample_to_batch_center_origin(image, target_shape, batch_size)
-    else:
-        return sample_to_batch_random_origin(image, target_shape, batch_size)
 
 
 def sample_to_batch(
@@ -189,20 +184,20 @@ def sample_to_batch(
     """Randomly sample an image to produce sample batch
 
     Arguments:
-        image                                Image to sample in channels_last format
+        image                               Image to sample in channels_last format
 
     Optional:
-        target_shape                         np.array containing output shape of each image sample. Must be square.
-        batch_size                           Number of sample to generate in image batch
+        target_shape                        np.array containing output shape of each image sample. Must be square.
+        batch_size                          Number of sample to generate in image batch
 
-        use_min_dimension                    Boolean indicating to use the minimum shape dimension as the cropping
-                                                 dimension. Must be True if target_shape is None. Will override
-                                                 target_shape regardless of shape value.
+        use_min_dimension                   Boolean indicating to use the minimum shape dimension as the cropping
+                                                dimension. Must be True if target_shape is None. Will override
+                                                target_shape regardless of shape value.
 
-        upscale_to_target                    Upscale the image so that image dimensions >= target_shape before sampling
+        upscale_to_target                   Upscale the image so that image dimensions >= target_shape before sampling
                                                 target_shape must be defined to use upscale_to_target
-
-        interpolation_method                       Interpolation method to used. Default cv2.INTER_CUBIC
+                                                
+        interpolation_method                Interpolation method to used. Default cv2.INTER_CUBIC
 
     Returns:
         4D array containing sampled images in axis=0.
@@ -212,8 +207,8 @@ def sample_to_batch(
     """
 
     native_shape = extract_height_width(image.shape)
-    target_shape = extract_height_width(target_shape)
     native_min_dim = np.min(native_shape)
+    target_shape = extract_height_width(target_shape) if (target_shape is not None) else None
 
     if target_shape is None:
         if not use_min_dimension:
@@ -223,44 +218,46 @@ def sample_to_batch(
             return TypeError(
                 "If upscale_to_target is True, target_shape must be defined")
     else:
-        if (not upscale_to_target and any(np.subtract(target_shape, native_shape) < 0)):
+        if (not upscale_to_target and any(np.subtract(native_shape, target_shape) < 0)):
             raise ValueError(
-                "If upscale_to_target is False, every dimension in target_shape must be greater than native shape")
+                "If upscale_to_target is False, every dimension in native shape must be greater than target shape")
 
-    # THIS IS NOT YET UNIT-TESTED
     if upscale_to_target:
         image = uniform_upscale_to_target_shape(image, target_shape)
 
-    # Use the minimum dimension if any dimension of image shape is less than the target shape
     if use_min_dimension:
         target_shape = np.array([native_min_dim, native_min_dim])
 
     if (target_shape is not None and (np.min(target_shape) > native_min_dim)):
         target_shape = np.array([native_min_dim, native_min_dim])
         
-    return sample_to_batch_target_shape(image, target_shape, batch_size, always_sample_center)
+    if always_sample_center:
+        return sample_to_batch_center_origin(image, target_shape, batch_size)
+    else:
+        return sample_to_batch_random_origin(image, target_shape, batch_size)
 
 
 
 if __name__ == "__main__":
 
     batch_size = 5
-    elephant = cv2.imread("../TestImages/poorlyFocused.png", cv2.IMREAD_COLOR)
+    elephant = cv2.imread("../TestImages/frames/frame_0002.png", cv2.IMREAD_COLOR)
 
-    random_batch = image_random_sampling_batch(
+    random_batch = sample_to_batch(
         elephant,
-        target_shape=[220, 220],
-        upscale_to_target=True,
+        target_shape=[100, 100],
+        upscale_to_target=False,
         batch_size=batch_size,
-        always_sample_center=True)
+        always_sample_center=False)
 
     for i in range(batch_size):
         cv2.imshow("mini", random_batch[i])
         cv2.waitKey(0)
 
-    random_batch_max = image_random_sampling_batch(
+    random_batch_max = sample_to_batch(
         elephant,
         use_min_dimension=True,
+        always_sample_center=True,
         batch_size=batch_size)
 
     for i in range(batch_size):

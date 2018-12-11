@@ -3,6 +3,7 @@ import unittest
 import src.utilities.imageUtilities as util
 import numpy as np
 
+from unittest.mock import MagicMock, ANY
 from src.constants.ultrasoundConstants import IMAGE_TYPE
 
 
@@ -120,7 +121,8 @@ class Test_TestCenterCropToTargetPercentage(unittest.TestCase):
         WIDTH_FRACTION = 0.80
         mock_image = np.zeros(IMAGE_SHAPE)
         self.assertEqual(
-            util.center_crop_to_target_percentage(mock_image, HEIGHT_FRACTION, WIDTH_FRACTION),
+            util.center_crop_to_target_percentage(
+                mock_image, HEIGHT_FRACTION, WIDTH_FRACTION),
             ((25, 40) + (449, 320))
         )
 
@@ -130,17 +132,19 @@ class Test_TestCenterCropToTargetPercentage(unittest.TestCase):
         WIDTH_FRACTION = 0.80
         mock_image = np.zeros(IMAGE_SHAPE)
         self.assertEqual(
-            util.center_crop_to_target_percentage(mock_image, HEIGHT_FRACTION, WIDTH_FRACTION),
+            util.center_crop_to_target_percentage(
+                mock_image, HEIGHT_FRACTION, WIDTH_FRACTION),
             ((0, 0) + IMAGE_SHAPE)
         )
-    
+
     def test_reject_crop_greater_leq_zero_fraction(self):
         IMAGE_SHAPE = (500, 400)
         HEIGHT_FRACTION = 0.90
         WIDTH_FRACTION = 0.0
         mock_image = np.zeros(IMAGE_SHAPE)
         self.assertEqual(
-            util.center_crop_to_target_percentage(mock_image, HEIGHT_FRACTION, WIDTH_FRACTION),
+            util.center_crop_to_target_percentage(
+                mock_image, HEIGHT_FRACTION, WIDTH_FRACTION),
             ((0, 0) + IMAGE_SHAPE)
         )
 
@@ -152,7 +156,8 @@ class Test_TestCenterCropToTargetPadding(unittest.TestCase):
         WIDTH_PADDING = 50
         mock_image = np.zeros(IMAGE_SHAPE)
         self.assertEqual(
-            util.center_crop_to_target_padding(mock_image, HEIGHT_PADDING, WIDTH_PADDING),
+            util.center_crop_to_target_padding(
+                mock_image, HEIGHT_PADDING, WIDTH_PADDING),
             ((HEIGHT_PADDING, WIDTH_PADDING) + (480, 300))
         )
 
@@ -162,7 +167,8 @@ class Test_TestCenterCropToTargetPadding(unittest.TestCase):
         WIDTH_PADDING = -1
         mock_image = np.zeros(IMAGE_SHAPE)
         self.assertEqual(
-            util.center_crop_to_target_padding(mock_image, HEIGHT_PADDING, WIDTH_PADDING),
+            util.center_crop_to_target_padding(
+                mock_image, HEIGHT_PADDING, WIDTH_PADDING),
             ((0, 0) + IMAGE_SHAPE)
         )
 
@@ -172,10 +178,60 @@ class Test_TestCenterCropToTargetPadding(unittest.TestCase):
         WIDTH_PADDING = 10
         mock_image = np.zeros(IMAGE_SHAPE)
         self.assertEqual(
-            util.center_crop_to_target_padding(mock_image, HEIGHT_PADDING, WIDTH_PADDING),
+            util.center_crop_to_target_padding(
+                mock_image, HEIGHT_PADDING, WIDTH_PADDING),
             ((0, 0) + IMAGE_SHAPE)
         )
-    
+
+
+class Test_TestUniformUpscaleToTargetShape(unittest.TestCase):
+
+    def test_standard_arguments(self):
+        # Setup mock on function
+        applyImageUpscaleMock = MagicMock()
+        util.apply_image_upscale = applyImageUpscaleMock
+        # Setup mock image and args
+        IMAGE_SHAPE = (94, 83)
+        TARGET_SHAPE = (113, 90)
+        SAFE_UPSCALE_RATIO = 1.02
+        mock_image = np.zeros(IMAGE_SHAPE)
+
+        expectedUpscaleFactor = max(np.divide(TARGET_SHAPE, IMAGE_SHAPE))
+
+        util.uniform_upscale_to_target_shape(
+            mock_image,
+            TARGET_SHAPE,
+            safe_upscale_ratio=SAFE_UPSCALE_RATIO)
+
+        applyImageUpscaleMock.assert_called_once_with(
+            mock_image,
+            expectedUpscaleFactor * SAFE_UPSCALE_RATIO,
+            expectedUpscaleFactor * SAFE_UPSCALE_RATIO
+        )
+
+class Test_TestSampleToBatchCenterOrigin(unittest.TestCase):
+
+    def test_standard_arguments(self):
+        centerCropToTargetShapeMock = MagicMock()
+        applyMultipleCropsMock = MagicMock()
+
+        util.center_crop_to_target_shape = centerCropToTargetShapeMock
+        util.apply_multiple_crops = applyMultipleCropsMock
+
+        # Setup mock image and args
+        IMAGE_SHAPE = (94, 83)
+        TARGET_SHAPE = (113, 90)
+        BATCH_SIZE = 5
+        mock_image = np.zeros(IMAGE_SHAPE)
+
+        util.sample_to_batch_center_origin(mock_image, TARGET_SHAPE, BATCH_SIZE)
+
+        # Should get the single crop description
+        self.assertEqual(centerCropToTargetShapeMock.call_count, 1)
+        # Apply multiple called once with repeated crop description
+        applyMultipleCropsMock.assert_called_once_with(mock_image, ANY)
+        args, _ = applyMultipleCropsMock.call_args_list[0]
+        self.assertEqual(len(args[1]), BATCH_SIZE)
 
 if __name__ == '__main__':
     unittest.main()
