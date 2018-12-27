@@ -1,6 +1,6 @@
 import unittest
 
-import src.utilities.imageUtilities as util
+import src.utilities.image.image_utilities as util
 import numpy as np
 
 from unittest.mock import MagicMock, ANY
