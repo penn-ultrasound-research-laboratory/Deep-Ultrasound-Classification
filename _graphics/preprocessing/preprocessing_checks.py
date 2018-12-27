@@ -6,18 +6,18 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 
-from utilities.AutomaticSegmentation import get_ROI_debug
-from constants.ultrasoundConstants import HSV_COLOR_THRESHOLD
-from constants.ultrasoundConstants import (
+from src.utilities.segmentation.xianauto.automatic_segmentation import get_ROI_debug
+
+from src.constants.ultrasoundConstants import HSV_COLOR_THRESHOLD
+from src.constants.ultrasoundConstants import (
     IMAGE_TYPE,
     IMAGE_TYPE_LABEL,
     FRAME_LABEL,
     FRAME_DEFAULT_ROW_CROP_FOR_SCAN_SELECTION,
     FRAME_DEFAULT_COL_CROP_FOR_SCAN_SELECTION)
 
-from utilities.focus.grayscaleImageFocus import select_scan_window_from_frame
-
-from pipeline.PatientSampleGenerator import PatientSampleGenerator
+from src.utilities.segmentation.brute.grayscale_segmentation import select_scan_window_from_frame
+from src.pipeline.patientsample.patient_sample_generator import PatientSampleGenerator
 
 
 def __select_random_grayscale_frame(patient_frames_path, manifest, patient):
@@ -136,43 +136,3 @@ def __grayscale_region_of_interest_graphic(
         
         cv2.imshow("Patient: {} | Type: {}".format(p, label), color_image)
         cv2.waitKey(0)
-
-
-if __name__ == "__main__":
-
-    PARSER = argparse.ArgumentParser()
-
-    PARSER.add_argument(
-        "benign_top_level_path",
-        type=str,
-        help="Path to benign top level directory")
-
-    PARSER.add_argument(
-        "malignant_top_level_path",
-        type=str,
-        help="Path to malignant top level directory")
-
-    PARSER.add_argument(
-        "manifest_path",
-        type=str,
-        help="Absolute path to manifest file"
-    )
-
-    PARSER.add_argument(
-        "frame_folder",
-        type=str,
-        help="Folder name (a timestamp by default) containing patient frames for a single run"
-    )
-
-    ARGS = PARSER.parse_args()
-
-    # python3 -m _graphics.preprocessingChecks ../100_Cases/ComprehensiveMaBenign/Benign ../100_Cases/ComprehensiveMaBenign/Malignant ../ProcessedDatasets/2018-08-25/manifest_2018-08-25_18-52-25.json 2018-08-25_18-52-25
-
-    __grayscale_region_of_interest_graphic(
-        ARGS.benign_top_level_path,
-        ARGS.malignant_top_level_path,
-        ARGS.manifest_path,
-        "frames",
-        rows = 1,
-        cols= 5
-    )
