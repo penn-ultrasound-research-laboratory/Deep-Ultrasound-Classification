@@ -158,25 +158,3 @@ def load_select_save_color_image_focus(
 
     except Exception as e:
         raise IOError("Error isolating and saving image focus. " + str(e))
-
-
-if __name__ == "__main__":
-
-    # construct the argument parse and parse the arguments
-    ap = argparse.ArgumentParser()
-
-    ap.add_argument("-i", "--image", required=True,
-        help="path to input image target of OCR subroutine")
-
-    ap.add_argument("-p", "--preprocess", type=str, default="thresh",
-        help="type of preprocessing to be done")
-        
-    args = vars(ap.parse_args())
-
-    image_focus = load_select_color_image_focus(
-        args["image"],
-        np.array(HSV_COLOR_THRESHOLD.LOWER.value, np.uint8), 
-        np.array(HSV_COLOR_THRESHOLD.UPPER.value, np.uint8))
-
-    cv2.imshow("focus", image_focus)
-    cv2.waitKey(0)

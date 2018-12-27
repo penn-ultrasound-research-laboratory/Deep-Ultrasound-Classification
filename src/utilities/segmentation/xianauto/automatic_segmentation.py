@@ -8,8 +8,8 @@ import numpy as np
 import scipy.stats as scp
 import matplotlib.pyplot as plt
 
-from constants.ultrasoundConstants import IMAGE_TYPE
-from constants.AutomaticSegmentationConstants import (
+from src.constants.ultrasoundConstants import IMAGE_TYPE
+from src.constants.AutomaticSegmentationConstants import (
     FIND_SEED_POINT_STOPPING_CRITERION,
     FIND_SEED_POINT_MAXIMUM_ITERATIONS,
     FIND_SEED_POINT_NUMBER_DIRECTIONS,
@@ -282,13 +282,3 @@ def get_ROI(image):
 
     return image[y:y+h, x:x+w]
 
-
-if __name__ == "__main__":
-
-    for i, f in enumerate(os.listdir("../TestImages/bank")):
-        
-        img = cv2.imread("../TestImages/bank/{}".format(f), cv2.IMREAD_GRAYSCALE)
-        roi = get_ROI(img)
-               
-        cv2.imshow("ROI", roi)
-        cv2.waitKey(0)

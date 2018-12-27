@@ -1,4 +1,4 @@
-import json, sys
+import json
 
 def merge_manifest(path_to_manifest_a, path_to_manifest_b, output_path):
     with open(path_to_manifest_a, 'r') as f:
@@ -11,6 +11,3 @@ def merge_manifest(path_to_manifest_a, path_to_manifest_b, output_path):
 
     with open(output_path, 'w') as f:
         json.dump(composite_manifest, f)
-
-if __name__ == '__main__':
-    merge_manifest(sys.argv[1], sys.argv[2], sys.argv[3])
