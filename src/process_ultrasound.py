@@ -9,12 +9,13 @@ from datetime import datetime
 import cv2
 import numpy as np
 
-from utilities.imageUtilities import determine_image_type
-from utilities.focus.colorImageFocus import load_select_color_image_focus
-from utilities.focus.grayscaleImageFocus import load_select_scan_window
-from utilities.ocrUtilities import isolate_text
+from src.utilities.image.image_utilities import determine_image_type
+from src.utilities.segmentation.brute.grayscale_segmentation import load_select_save_scan_window
+from src.utilities.segmentation.brute.color_segmentation import load_select_color_image_focus
 
-from constants.ultrasoundConstants import (
+from src.utilities.ocr.ocr_utilities import isolate_text
+
+from src.constants.ultrasoundConstants import (
     FOCUS_HASH_LABEL,
     FRAME_LABEL,
     HSV_COLOR_THRESHOLD,
@@ -52,7 +53,7 @@ def frame_segmentation(
     else:
 
         # Load grayscale frame and select the scan window
-        image_focus = load_select_scan_window(
+        image_focus = load_select_save_scan_window(
             path_to_frame, 
             np.array(HSV_GRAYSCALE_THRESHOLD.LOWER.value, np.uint8),
             np.array(HSV_GRAYSCALE_THRESHOLD.UPPER.value, np.uint8))
@@ -454,61 +455,3 @@ def process_patient_set(
 
     # Cleanup
     manifest_file.close()
-
-
-if __name__ == "__main__":
-
-    PARSER = argparse.ArgumentParser()
-
-    PARSER.add_argument("path_to_benign_dir",
-                        help="absolute path to top level directory containing benign patient folders")
-
-    PARSER.add_argument("path_to_malignant_dir",
-                        help="absolute path to top level directory containing malignant patient folders")
-
-    PARSER.add_argument("-frames", "--relative_path_to_frames_directory",
-                        type=str,
-                        default="frames",
-                        help="relative path from the patient folder to patient frames folder")
-
-    PARSER.add_argument("-focus", "--rel_path_to_focus_output_folder",
-                        type=str,
-                        default="focus",
-                        help="relative path from the patient folder to frame focus output folder ")
-
-    PARSER.add_argument("-out", "--path_to_manifest_output_dir",
-                        type=str,
-                        default=".",
-                        help="absolute path to manifest/failure log output directory")
-
-    PARSER.add_argument("-time",
-                        "--timestamp",
-                        type=str,
-                        default=None,
-                        help="timestamp to use instead of generating one using the current time")
-
-    PARSER.add_argument("-up",
-                        "--upscale",
-                        type=int,
-                        default=0,
-                        help="Boolean indicating whether to upscale frame focuses to the maximum value in the manifest")
-
-    ## Missing functionality to wipe out old folders, manifests, error logs
-
-    ARGS = PARSER.parse_args()
-
-    TIMESTAMP = ARGS.timestamp if ARGS.timestamp is not None else datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-
-    logging.basicConfig(level=logging.INFO, filename="{}/preprocess_{}.log".format(
-        ARGS.path_to_manifest_output_dir,
-        TIMESTAMP
-    ))
-
-    process_patient_set(
-        ARGS.path_to_benign_dir,
-        ARGS.path_to_malignant_dir,
-        ARGS.relative_path_to_frames_directory,
-        ARGS.rel_path_to_focus_output_folder,
-        ARGS.path_to_manifest_output_dir,
-        timestamp=TIMESTAMP,
-        upscale_to_maximum=bool(ARGS.upscale))

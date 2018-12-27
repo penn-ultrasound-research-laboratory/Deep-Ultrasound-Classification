@@ -3,7 +3,6 @@ import argparse
 import numpy as np
 import tensorflow as tf
 from tqdm import tqdm
-from constants.exceptions.customExceptions import TrainEvaluateLinearClassifierException
 
 tf.logging.set_verbosity(tf.logging.INFO)
 
@@ -82,22 +81,3 @@ def train_evaluate_linear_classifier(abs_path_to_np_data):
         train_steps=1000)
 
     experiment.train_and_evaluate()
-
-
-if __name__ == "__main__":
-
-    parser = argparse.ArgumentParser()
-
-    parser.add_argument(
-        "abs_path_to_np_data",
-        type=str,
-        help="Absolute path to numpy data file. Data format is dictionary")
-
-    args = vars(parser.parse_args())
-
-    try:
-        train_evaluate_linear_classifier(
-            args["abs_path_to_np_data"])
-    
-    except TrainEvaluateLinearClassifierException as e:
-        traceback.print_exc()

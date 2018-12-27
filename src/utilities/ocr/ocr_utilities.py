@@ -1,20 +1,21 @@
-# import the necessary packages
-from constants.ultrasoundConstants import (
-	IMAGE_TYPE,
-	READOUT_ABBREVS as RA,
-	WALL_FILTER_MODES
-)
-
-from PIL import Image
-
-import numpy as np
-
 import os
 import re 
 import cv2 
 import argparse 
 import pytesseract 
 import uuid
+
+import numpy as np
+
+from PIL import Image
+
+# import the necessary packages
+from src.constants.ultrasoundConstants import (
+	IMAGE_TYPE,
+	READOUT_ABBREVS as RA,
+	WALL_FILTER_MODES
+)
+
 
 def isolate_text(grayscale_image, image_type):
 	
@@ -144,33 +145,3 @@ def isolate_text(grayscale_image, image_type):
 		FOUND_TEXT[RA.PULSE_REPITITION_FREQUENCY] = int(max(numerical_strings, key=len))
 
 	return FOUND_TEXT
-
-
-
-if __name__ == "__main__":
-	# construct the argument parse and parse the arguments
-	parser = argparse.ArgumentParser()
-
-	parser.add_argument("-i",
-                 "--image",
-                 required=True,
-                 help="path to input image to be OCR'd")
-
-	parser.add_argument("-t",
-                     "--image_type",
-                     type=str,
-                     default=IMAGE_TYPE.GRAYSCALE,
-                     help="Image type (COLOR/GRAYSCALE)")
-
-	args = parser.parse_args()
-
-	# load the example image and convert it to grayscale
-	image = cv2.imread(args.image)
-	gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-	gray = cv2.threshold(gray, 0, 255,
-		cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
-		
-	print(isolate_text(
-		gray, 
-		args.image_type))
-

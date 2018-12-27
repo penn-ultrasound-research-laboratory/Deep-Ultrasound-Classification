@@ -7,7 +7,7 @@ import uuid
 import numpy as np
 import matplotlib.pyplot as plt
 
-from constants.ultrasoundConstants import (
+from src.constants.ultrasoundConstants import (
     IMAGE_TYPE,
     IMAGE_TYPE_LABEL,
     TUMOR_BENIGN,
@@ -16,14 +16,15 @@ from constants.ultrasoundConstants import (
     FOCUS_HASH_LABEL,
     FRAME_LABEL,
     SCALE_LABEL)
-from constants.modelConstants import (
+
+from src.constants.modelConstants import (
     DEFAULT_BATCH_SIZE,
     SAMPLE_WIDTH,
     SAMPLE_HEIGHT)
-from constants.ultrasoundConstants import tumor_integer_label
-from constants.exceptions.customExceptions import PatientSampleGeneratorException
-from utilities.imageUtilities import image_random_sampling_batch
-from keras.preprocessing.image import ImageDataGenerator
+    
+from src.constants.ultrasoundConstants import tumor_integer_label
+from src.constants.exceptions.customExceptions import PatientSampleGeneratorException
+from src.utilities.image.image_utilities import sample_to_batch
 from keras.utils import to_categorical
 
 LOGGER = logging.getLogger('research')
@@ -182,7 +183,7 @@ class PatientSampleGenerator:
 
             else:
                 
-                raw_image_batch = image_random_sampling_batch(
+                raw_image_batch = sample_to_batch(
                     loaded_image, 
                     target_shape=self.target_shape,
                     upscale_to_target=True,
@@ -235,69 +236,3 @@ class PatientSampleGenerator:
             self.__move_to_next_generator_patient_frame_state(is_last_frame, is_last_patient)
 
         return
-
-
-
-if __name__ == "__main__":
-
-    dirname = os.path.dirname(__file__)
-
-    with open(os.path.abspath("../ProcessedDatasets/2018-08-25/manifest_2018-08-25_18-52-25.json"), "r") as fp:
-        manifest = json.load(fp)
-
-    logging.basicConfig(level = logging.INFO, filename = "./main_output.log")
-
-    # W/ aim of generating graphics for paper / email. Featurwise normalize according to mean or std. 
-    # That should be used only in image preprocessing pipeline. Issue is that negative scaled values are 
-    # meaningless when saving to file or displaying as negative values are truncated to zero. 
-
-    image_data_generator = ImageDataGenerator(
-        horizontal_flip = True,
-        vertical_flip = True)
-
-    BATCH_SIZE = 5
-    MAX_PLOTTING_ROWS = 10
-
-    # Limit to small subset of patients
-
-    patient_sample_generator = next(PatientSampleGenerator([
-        ("01PER2043096", "BENIGN"),
-        ("79BOY3049163", "MALIGNANT"),
-        ("93KUD3041008", "MALIGNANT")],
-    os.path.join(dirname, "../../100_Cases/ComprehensiveMaBenign/Benign"),
-    os.path.join(
-        dirname, "../../100_Cases/ComprehensiveMaBenign/Malignant"),
-    manifest,
-    target_shape=[220, 220],
-    image_type=IMAGE_TYPE.ALL,
-    image_data_generator=image_data_generator,
-    timestamp="2018-08-25_18-52-25",
-    batch_size=BATCH_SIZE,
-    kill_on_last_patient=True
-))
-
-    count = 0
-    plot_rows = []
-    try:
-        while count < MAX_PLOTTING_ROWS:
-            raw_image_batch, labels = next(patient_sample_generator)
-                
-            split = np.split(raw_image_batch, raw_image_batch.shape[0], axis=0)
-            split = [ np.squeeze(img, axis=0) for img in split]
-
-            # cv2.imshow("sample", np.hstack(split))
-            # cv2.waitKey(0)
-
-            plot_rows.append(np.hstack(split))
-
-            count += 1 
-
-    except Exception as e:
-        print(e)
-
-    sample_thumbnails = np.vstack(plot_rows)
-
-    # cv2.imshow("sample", sample_thumbnails)
-    # cv2.waitKey(0)
-
-    cv2.imwrite('thumbnails_{}.png'.format(uuid.uuid4()), sample_thumbnails)
