@@ -30,6 +30,30 @@ from keras.utils import to_categorical
 LOGGER = logging.getLogger('research')
 
 class PatientSampleGenerator:
+
+    def __frame_image_type_match(self, frame):
+        if self.image_type is not IMAGE_TYPE.ALL:
+            return frame[IMAGE_TYPE_LABEL] == self.image_type.value
+        else:
+            return True
+
+
+    def __frame_contains_segment(self, frame):
+        return FOCUS_HASH_LABEL in frame
+
+
+    def __frame_is_valid_sample(self, frame):
+        return self.__frame_image_type_match(frame) and self.__frame_contains_segment(frame)
+
+
+    def __frame_samples(self, frames):
+        return [self.__frame_is_valid_sample(frame) for frame in frames]
+
+
+    def __patient_has_samples(self, patient_id):
+        return len(self.__frame_samples(self.manifest[patient_id])) > 0
+
+
     """Generator that returns batches of samples for training and evaluation
 
     Arguments:
@@ -46,7 +70,7 @@ class PatientSampleGenerator:
         target_shape                         array containing target shape to use for output samples
         timestamp                            timestamp string to append in focus directory path
 
-        kill_on_last_patient                 Cycle through all matching patients exactly once. Forces generator to act                                      
+        kill_on_last_patient                 Cycle through all matching patients exactly once. Forces generator to act
                                                 like single-shot iterator
 
         use_categorical                      Output class labels one-hot categorical matrix instead of dense numerical
@@ -58,7 +82,6 @@ class PatientSampleGenerator:
     Raises:
         PatientSampleGeneratorException      for any error generating sample batches
     """
-
     def __init__(self,
                  patient_list,
                  benign_top_level_path,
@@ -87,12 +110,7 @@ class PatientSampleGenerator:
         # Find all the patientIds with at least one frame in the specified IMAGE_TYPE
         # Patient list is unfiltered if IMAGE_TYPE.
         
-        if image_type is IMAGE_TYPE.ALL:
-            cleared_patients = [patient[0] for patient in patient_list]
-        else:
-            cleared_patients = list(filter(
-                lambda patient: any([self.__is_frame_clear(frame) for frame in manifest[patient]]), 
-                [patient[0] for patient in patient_list]))
+        cleared_patients = [patient_id for patient_id, _ in patient_list if self.__patient_has_samples(patient_id)]
 
         if not cleared_patients:
             raise PatientSampleGeneratorException(
@@ -100,9 +118,8 @@ class PatientSampleGenerator:
 
         # Determine the total number of cleared frames 
         # External functions may need to preallocate memory. Helpful to maintain count of frames.
-        total_num_cleared_frames = 0
-        for patient in cleared_patients:
-            total_num_cleared_frames += len([frame for frame in manifest[patient] if self.__is_frame_clear(frame)])
+        
+        total_num_cleared_frames = sum(len(self.__frame_samples(manifest[patient])) for patient in cleared_patients)
         
         self.total_num_cleared_frames = total_num_cleared_frames
         self.cleared_patients = cleared_patients
@@ -110,8 +127,6 @@ class PatientSampleGenerator:
 
         self.__load_current_patient_frames_into_generator()
 
-    def __is_frame_clear(self, frame):
-        return frame[IMAGE_TYPE_LABEL] == self.image_type.value and FOCUS_HASH_LABEL in frame
 
     def __load_current_patient_frames_into_generator(self):
         """Private method to update current patient information based on patient_index"""
@@ -150,6 +165,7 @@ class PatientSampleGenerator:
             self.patient_index += 1
             self.frame_index = 0
             self.__load_current_patient_frames_into_generator()
+
 
     def __next__(self):
 
