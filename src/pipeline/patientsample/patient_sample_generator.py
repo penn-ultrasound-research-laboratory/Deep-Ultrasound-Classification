@@ -7,6 +7,8 @@ import uuid
 import numpy as np
 import matplotlib.pyplot as plt
 
+import src.utilities.manifest.manifest_utilities as mu
+
 from src.constants.ultrasoundConstants import (
     IMAGE_TYPE,
     IMAGE_TYPE_LABEL,
@@ -21,39 +23,17 @@ from src.constants.modelConstants import (
     DEFAULT_BATCH_SIZE,
     SAMPLE_WIDTH,
     SAMPLE_HEIGHT)
-    
+
 from src.constants.ultrasoundConstants import tumor_integer_label
 from src.constants.exceptions.customExceptions import PatientSampleGeneratorException
 from src.utilities.image.image_utilities import sample_to_batch
+
 from keras.utils import to_categorical
 
 LOGGER = logging.getLogger('research')
 
+
 class PatientSampleGenerator:
-
-    def __frame_image_type_match(self, frame):
-        if self.image_type is not IMAGE_TYPE.ALL:
-            return frame[IMAGE_TYPE_LABEL] == self.image_type.value
-        else:
-            return True
-
-
-    def __frame_contains_segment(self, frame):
-        return FOCUS_HASH_LABEL in frame
-
-
-    def __frame_is_valid_sample(self, frame):
-        return self.__frame_image_type_match(frame) and self.__frame_contains_segment(frame)
-
-
-    def __frame_samples(self, frames):
-        return [self.__frame_is_valid_sample(frame) for frame in frames]
-
-
-    def __patient_has_samples(self, patient_id):
-        return len(self.__frame_samples(self.manifest[patient_id])) > 0
-
-
     """Generator that returns batches of samples for training and evaluation
 
     Arguments:
@@ -82,6 +62,7 @@ class PatientSampleGenerator:
     Raises:
         PatientSampleGeneratorException      for any error generating sample batches
     """
+
     def __init__(self,
                  patient_list,
                  benign_top_level_path,
@@ -94,7 +75,7 @@ class PatientSampleGenerator:
                  timestamp=None,
                  kill_on_last_patient=False,
                  use_categorical=False):
-        
+
         self.raw_patient_list = patient_list
         self.manifest = manifest
         self.benign_top_level_path = benign_top_level_path
@@ -109,24 +90,24 @@ class PatientSampleGenerator:
 
         # Find all the patientIds with at least one frame in the specified IMAGE_TYPE
         # Patient list is unfiltered if IMAGE_TYPE.
-        
-        cleared_patients = [patient_id for patient_id, _ in patient_list if self.__patient_has_samples(patient_id)]
+
+        cleared_patients = [
+            patient_id for patient_id, _ in patient_list if mu.patient_has_samples(manifest, patient_id, image_type)]
 
         if not cleared_patients:
             raise PatientSampleGeneratorException(
                 "No patients found with focus in image type: {0}".format(self.image_type.value))
 
-        # Determine the total number of cleared frames 
+        # Determine the total number of cleared frames
         # External functions may need to preallocate memory. Helpful to maintain count of frames.
-        
-        total_num_cleared_frames = sum(len(self.__frame_samples(manifest[patient])) for patient in cleared_patients)
-        
+
+        total_num_cleared_frames = sum(mu.count_valid_frame_samples(manifest[patient], image_type) for patient in cleared_patients)
+
         self.total_num_cleared_frames = total_num_cleared_frames
         self.cleared_patients = cleared_patients
         self.patient_index = self.frame_index = 0
 
         self.__load_current_patient_frames_into_generator()
-
 
     def __load_current_patient_frames_into_generator(self):
         """Private method to update current patient information based on patient_index"""
@@ -145,8 +126,8 @@ class PatientSampleGenerator:
                 frame for frame in all_patient_frames if frame[IMAGE_TYPE_LABEL] == self.image_type.value]
 
         # Frames must contain an image focus
-        self.patient_frames = [frame for frame in self.patient_frames if FOCUS_HASH_LABEL in frame]
-
+        self.patient_frames = [
+            frame for frame in self.patient_frames if FOCUS_HASH_LABEL in frame]
 
     def __move_to_next_generator_patient_frame_state(self, current_is_last_frame, current_is_last_patient):
         if not current_is_last_frame:
@@ -155,7 +136,8 @@ class PatientSampleGenerator:
         elif current_is_last_patient:
             # Last patient frame. Loop back to first patient or terminate
             if self.kill_on_last_patient:
-                raise StopIteration("Reached the last patient. Terminating PatientSampleGenerator.")
+                raise StopIteration(
+                    "Reached the last patient. Terminating PatientSampleGenerator.")
 
             self.patient_index = 0
             self.frame_index = 0
@@ -166,23 +148,24 @@ class PatientSampleGenerator:
             self.frame_index = 0
             self.__load_current_patient_frames_into_generator()
 
-
     def __next__(self):
 
         while True:
 
             current_frame_color = self.patient_frames[self.frame_index][IMAGE_TYPE_LABEL]
             is_last_frame = self.frame_index == len(self.patient_frames) - 1
-            is_last_patient = self.patient_index == len(self.cleared_patients) - 1
-                
+            is_last_patient = self.patient_index == len(
+                self.cleared_patients) - 1
+
             color_mode = (
                 cv2.IMREAD_COLOR if current_frame_color == IMAGE_TYPE.COLOR.value
                 else cv2.IMREAD_GRAYSCALE)
 
-            loaded_image = cv2.imread("{}".format(self.patient_frames[self.frame_index][FOCUS_HASH_LABEL]), color_mode)
+            loaded_image = cv2.imread("{}".format(
+                self.patient_frames[self.frame_index][FOCUS_HASH_LABEL]), color_mode)
 
             # All images are processed as RGB
-            # TODO: Verify that this makes sense with channel ordering. I thought OpenCV 
+            # TODO: Verify that this makes sense with channel ordering. I thought OpenCV
             # typically used GBR and not RGB
 
             if current_frame_color == IMAGE_TYPE.GRAYSCALE.value:
@@ -190,17 +173,18 @@ class PatientSampleGenerator:
 
             if loaded_image is None or len(loaded_image.shape) < 2:
                 LOGGER.info("Skipping due to corruption: %s | frame: %s",
-                    self.patient_id,
-                    self.patient_frames[self.frame_index][FOCUS_HASH_LABEL])
+                            self.patient_id,
+                            self.patient_frames[self.frame_index][FOCUS_HASH_LABEL])
 
-                # Stored image is corrupted. Skip to next frame. 
-                self.__move_to_next_generator_patient_frame_state(is_last_frame, is_last_patient)
+                # Stored image is corrupted. Skip to next frame.
+                self.__move_to_next_generator_patient_frame_state(
+                    is_last_frame, is_last_patient)
                 continue
 
             else:
-                
+
                 raw_image_batch = sample_to_batch(
-                    loaded_image, 
+                    loaded_image,
                     target_shape=self.target_shape,
                     upscale_to_target=True,
                     batch_size=self.batch_size,
@@ -209,7 +193,8 @@ class PatientSampleGenerator:
                 LOGGER.info("Raw Image Batch shape: %s", raw_image_batch.shape)
 
                 # Convert the tumor string label to integer label
-                frame_label = tumor_integer_label(self.patient_frames[self.frame_index][TUMOR_TYPE_LABEL])
+                frame_label = tumor_integer_label(
+                    self.patient_frames[self.frame_index][TUMOR_TYPE_LABEL])
 
                 # Optional image preprocessing
                 if self.image_data_generator is not None:
@@ -224,31 +209,33 @@ class PatientSampleGenerator:
 
                     gen = self.image_data_generator.flow(
                         raw_image_batch,
-                        batch_size=self.batch_size, 
+                        batch_size=self.batch_size,
                         shuffle=True)
 
-                    # Output of ImageDataGenerator assigned to raw_image_batch is now preprocessed. Values will be 
-                    # negative in range spanning zero if mean normalization is included as part of preprocessing 
-                    # functions. 
+                    # Output of ImageDataGenerator assigned to raw_image_batch is now preprocessed. Values will be
+                    # negative in range spanning zero if mean normalization is included as part of preprocessing
+                    # functions.
 
                     raw_image_batch = next(gen)
 
-                    LOGGER.debug("Used image data generator to transform input image to shape: {}".format(raw_image_batch.shape))
+                    LOGGER.debug("Used image data generator to transform input image to shape: {}".format(
+                        raw_image_batch.shape))
 
             LOGGER.info("Training on patient: %s | color: %s | frame: %s",
-                self.patient_id, 
-                current_frame_color, 
-                self.patient_frames[self.frame_index][FOCUS_HASH_LABEL])
+                        self.patient_id,
+                        current_frame_color,
+                        self.patient_frames[self.frame_index][FOCUS_HASH_LABEL])
 
             if self.use_categorical:
                 yield (
-                    raw_image_batch, 
+                    raw_image_batch,
                     to_categorical(np.repeat(frame_label, self.batch_size), num_classes=2))
             else:
                 yield (
-                    raw_image_batch, 
+                    raw_image_batch,
                     np.repeat(frame_label, self.batch_size))
 
-            self.__move_to_next_generator_patient_frame_state(is_last_frame, is_last_patient)
+            self.__move_to_next_generator_patient_frame_state(
+                is_last_frame, is_last_patient)
 
         return
