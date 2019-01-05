@@ -30,7 +30,7 @@ def frame_pass_valid_sample_criteria(frame, image_type):
 
 def get_valid_frame_samples(frames, image_type):
     """Return frames that pass sample criteria. Must match target image type and have segment"""
-    return [frame_pass_valid_sample_criteria(frame, image_type) for frame in frames]
+    return [f for f in frames if frame_pass_valid_sample_criteria(f, image_type)]
 
 def count_valid_frame_samples(frames, image_type):
     return len(get_valid_frame_samples(frames, image_type))
