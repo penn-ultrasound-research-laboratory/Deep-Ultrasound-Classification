@@ -38,8 +38,8 @@ def count_valid_frame_samples(frames, image_type):
 
 def patient_has_samples(manifest, patient_id, image_type):
     """Returns true if there is at least one frame that passes validity criteria"""
-    return len(get_valid_frame_samples(manifest[patient_id], image_type)) > 0
-
+    return count_valid_frame_samples(manifest[patient_id], image_type) > 0
+    
 
 def merge_manifest(path_to_manifest_a, path_to_manifest_b, output_path):
     with open(path_to_manifest_a, 'r') as f:
