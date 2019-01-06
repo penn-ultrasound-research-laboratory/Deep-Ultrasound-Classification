@@ -7,11 +7,11 @@ Notice: This repository will be shifting to Google Cloud Platform in the near-fu
 
 ## Objective
 
-Improve the classification of breast ultrasound images using state-of-the-art techniques in deep learning. Our goal is to explore using recent advances in CNNs to achieve best in domain performance on classifying breast tumor ultrasound to diagnosis whether a tumor is benign or malignant. 
+Improve the classification of breast ultrasound images using state-of-the-art techniques in deep learning. Our goal is to use recent advances in CNNs to achieve best in domain performance on classifying breast tumor ultrasound to diagnosis whether a tumor is benign or malignant. 
 
 ## Data Directory Structure
 
-Data is expected to loosely match the following hierarchy. Note that folder names can be anything - i.e. Malignant folder can be named "Malignant", "Mal", "M" etc. Loose structure is enfornced - malignant/benign top level folders contain all patients for that class. In each patient folder there must be a "frames" folder and a "focus" folder at some nested level. It is easiest to leave all folders exactly one level below the parent folder, but not required. Paths to various directories (PatientData, benign, malignant, focus, etc.) passed at runtime as arguments to CLI scripts. 
+Data is expected to loosely match the following hierarchy. Note that folder names can be anything - i.e. Malignant folder can be named "Malignant", "Mal", "M" etc. Loose structure is enforced - malignant/benign top level folders contain all patients for that class. In each patient folder there must be a "frames" folder and a "focus" folder at some nested level. It is easiest to leave all folders exactly one level below the parent folder, but not required. Paths to various directories (PatientData, benign, malignant, focus, etc.) passed at runtime as arguments to CLI scripts. 
 
 ```bash
 PatientData/

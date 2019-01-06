@@ -3,8 +3,8 @@ import cv2
 import uuid
 import numpy as np
 
-from constants.ultrasoundConstants import HSV_COLOR_THRESHOLD
-from utilities.imageUtilities import center_crop_to_target_pixel_boundary
+from src.constants.ultrasoundConstants import HSV_COLOR_THRESHOLD
+from src.utilities.image.image_utilities import center_crop_to_target_padding
 
 
 def get_color_image_focus(
@@ -71,7 +71,7 @@ def get_color_image_focus(
     image_focus = focus_image[y: y + h, x: x + w]
 
     # As conservative measure, crop inwards by small radius to guarantee no boundary
-    image_focus, _ = center_crop_to_target_pixel_boundary(
+    image_focus, _ = center_crop_to_target_padding(
         image_focus,
         crop_inside_boundary_radius,
         crop_inside_boundary_radius
