@@ -1,5 +1,9 @@
-# Ultrasound Research
+# Deep Ultrasound Classification
 Repository for ultrasound research collaboration between Penn SEAS and Radiology at Penn Medicine
+
+*************************************************************************************************
+Notice: This repository will be shifting to Google Cloud Platform in the near-future
+*************************************************************************************************
 
 ## Objective
 
