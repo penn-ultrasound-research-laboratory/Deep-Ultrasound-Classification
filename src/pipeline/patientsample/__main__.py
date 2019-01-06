@@ -39,7 +39,7 @@ patient_sample_generator = next(PatientSampleGenerator([
     os.path.join(
     dirname, "../../100_Cases/ComprehensiveMaBenign/Malignant"),
     manifest,
-    target_shape=[220, 220],
+    target_shape=[50, 50],
     image_type=IMAGE_TYPE.ALL,
     image_data_generator=image_data_generator,
     timestamp="2018-08-25_18-52-25",
