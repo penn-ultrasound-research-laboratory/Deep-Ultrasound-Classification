@@ -1,5 +1,7 @@
 import argparse
 
+from src.pipeline.train.train import train_model
+
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
@@ -33,6 +35,6 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
     arguments = args.__dict__
-    job_dir = arguments.pop("job_dir")
+    # job_dir = arguments.pop("job_dir")
 
     train_model(**arguments)
