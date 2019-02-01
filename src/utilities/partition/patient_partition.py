@@ -11,7 +11,11 @@ from src.constants.ultrasoundConstants import (
 import numpy as np
 
 
-def train_test_split_indices(train_split_percentage, test_split_percentage, number_samples):
+def train_test_split_indices(
+    train_split_percentage, 
+    test_split_percentage, 
+    number_samples,
+    random_seed=None):
     """Return train/test/validate indices for a given number of samples
 
     Given percentages to use for train/test/(validate) split, return indices that can be used to index
@@ -33,6 +37,9 @@ def train_test_split_indices(train_split_percentage, test_split_percentage, numb
             validation_indices
         )
     """
+
+    if random_seed is not None:
+         np.random.seed(random_seed)
 
     # Training indices
     train_indices = np.random.choice(
@@ -58,7 +65,8 @@ def train_test_split_indices(train_split_percentage, test_split_percentage, numb
 def patient_train_test_validation_split(
         benign_top_level_path,
         malignant_top_level_path,
-        include_validation=False):
+        include_validation=False,
+        random_seed=None):
     """Allocate patients to training, test, validation sets.
 
     The directory structure of the ultrasound data is split into Malignant and Benign folders at the top level. This
@@ -89,7 +97,8 @@ def patient_train_test_validation_split(
     train_indices, test_indices, validation_indices = train_test_split_indices(
         TRAIN_TEST_VALIDATION_SPLIT["TRAIN"],
         TRAIN_TEST_VALIDATION_SPLIT["TEST"],
-        num_malignant)
+        num_malignant,
+        random_seed=random_seed)
 
     # Partition always contains train/test
     patient_dataset = {
