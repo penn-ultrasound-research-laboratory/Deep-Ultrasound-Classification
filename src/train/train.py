@@ -1,9 +1,9 @@
 import tensorflow as tf
 from tensorflow.python.lib.io import file_io
+from src.utilities.partition.patient_partition import *
 
-def train_model(
-    train_file='sentiment_set.pickle',
-    job_dir='./tmp/example-5', **args):
+def train_model(**args):
+    print(args)
 
     # Load the configuration file yaml file if provided.
     # Else load the default experiment configuration file
