@@ -1,28 +1,40 @@
 import tensorflow as tf
+import json
 import yaml
 
 from tensorflow.python.lib.io import file_io
 from tensorflow.python.framework.errors_impl import NotFoundError
 from src.utilities.partition.patient_partition import *
+from src.utilities.general.general import default_none
 
 DEFAULT_CONFIG = "src/config/default.yaml"
 
 def train_model(args):
 
-    # Read YAML file
-    # Load the configuration file yaml file if provided.
-    config_file = DEFAULT_CONFIG if args.config is None else args.config
+    # Load the configuration file yaml file, if provided.
+    config_file = default_none(args.config, DEFAULT_CONFIG)
     try:
         with file_io.FileIO(config_file, mode='r') as stream:
             exp_config = yaml.load(stream)
     except NotFoundError as _:
-        print("File does not exist: {0}".format(config_file))
+        print("Configuration file not found: {0}".format(config_file))
         return
     except Exception as _:
         print("Unable to load configuration file: {0}".format(config_file))
         return
 
+    print(exp_config)
 
+    # Load the manifest file
+    try:
+        with file_io.FileIO(args.manifest, mode='r') as stream:
+            manifest = json.load(stream)
+    except NotFoundError as _:
+        print("Manifest file not found: {0}".format(args.manifest))
+        return
+    except Exception as _:
+        print("Unable to load manifest file: {0}".format(args.manifest))
+        return
 
     # logs_path = job_dir + '/logs/' + datetime.now().isoformat()
     # print('-----------------------')
