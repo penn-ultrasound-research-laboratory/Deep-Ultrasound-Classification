@@ -1,5 +1,6 @@
 import argparse
 
+from dotmap import DotMap
 from src.train.train import train_model
 
 if __name__ == "__main__":
@@ -47,7 +48,7 @@ if __name__ == "__main__":
     parser.add_argument('--disp_step', type=int, default=200, help='display step during training')
     
     args=parser.parse_args()
-    arguments=args.__dict__
+    arguments= DotMap(args.__dict__)
 
     # Execute the model
-    train_model(**arguments)
+    train_model(arguments)
