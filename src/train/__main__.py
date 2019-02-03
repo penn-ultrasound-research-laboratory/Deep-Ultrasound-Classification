@@ -44,8 +44,8 @@ if __name__ == "__main__":
     )
 
     parser.add_argument('--num_workers', type=int, default=4, help='number of data loading workers')
-    parser.add_argument('--cuda', type=bool, default=True, help='enable cuda')
     parser.add_argument('--disp_step', type=int, default=200, help='display step during training')
+    parser.add_argument('--cuda', type=bool, default=True, help='enable CUDA')
     
     args=parser.parse_args()
     arguments= DotMap(args.__dict__)

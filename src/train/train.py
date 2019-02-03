@@ -17,9 +17,8 @@ DEFAULT_CONFIG = "src/config/default.yaml"
 
 def train_model(args):
 
-    BENIGN_TOP_LEVEL_PATH = args.images + "/benign"
-    MALIGNANT_TOP_LEVEL_PATH = args.images + "/malignant"
-
+    BENIGN_TOP_LEVEL_PATH = args.images + "/Benign"
+    MALIGNANT_TOP_LEVEL_PATH = args.images + "/Malignant"
 
     # Establish logging
     logs_path = args.job_dir + '/logs/' + datetime.now().isoformat()
@@ -57,6 +56,7 @@ def train_model(args):
 
     image_data_generator = ImageDataGenerator(**config.image_preprocessing.toDict())
 
+    # THESE ARE INCORRECT
     training_sample_generator = PatientSampleGenerator(
         patient_split.train,
         BENIGN_TOP_LEVEL_PATH,
