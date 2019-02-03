@@ -66,8 +66,8 @@ def train_model(args):
         batch_size = config.batch_size,
         image_type = image_type,
         image_data_generator = image_data_generator,
-        timestamp = timestamp,
-        kill_on_last_patient = True)
+        kill_on_last_patient = True,
+        use_categorical = True)
 
     test_sample_generator = PatientSampleGenerator(
         test_partition,
@@ -78,8 +78,8 @@ def train_model(args):
         batch_size = config.batch_size,
         image_type = image_type,
         image_data_generator = image_data_generator,
-        timestamp = timestamp,
-        kill_on_last_patient = True)
+        kill_on_last_patient = True,
+        use_categorical = True)
         
 
     # Load the model specified in config

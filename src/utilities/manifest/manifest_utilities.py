@@ -19,19 +19,13 @@ def frame_image_type_match(frame, image_type):
     else:
         return frame[IMAGE_TYPE_LABEL] == image_type.value
 
-
-def frame_contains_segment(frame):
-    """Returns whether a frame has a segment"""
-    return FOCUS_HASH_LABEL in frame
-
-
 def frame_pass_valid_sample_criteria(frame, image_type):
-    """Returns whether a frame matches both segment and type criteria"""
-    return frame_image_type_match(frame, image_type) and frame_contains_segment(frame)
+    """Returns whether a frame matches type criteria"""
+    return frame_image_type_match(frame, image_type)
 
 
 def get_valid_frame_samples(frames, image_type):
-    """Return frames that pass sample criteria. Must match target image type and have segment"""
+    """Return frames that pass sample criteria. Must match target image type"""
     return [f for f in frames if frame_pass_valid_sample_criteria(f, image_type)]
 
 def count_valid_frame_samples(frames, image_type):
@@ -55,7 +49,7 @@ def merge_manifest(path_to_manifest_a, path_to_manifest_b, output_path):
     with open(output_path, 'w') as f:
         json.dump(composite_manifest, f)
         
-        
+
 def convert_old_manifest_to_new_format(path_to_manifest, path_to_images):
     with open(path_to_manifest, 'r') as f:
         manifest = json.load(f)
