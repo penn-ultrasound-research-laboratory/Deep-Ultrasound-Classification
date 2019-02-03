@@ -17,6 +17,10 @@ DEFAULT_CONFIG = "src/config/default.yaml"
 
 def train_model(args):
 
+    BENIGN_TOP_LEVEL_PATH = args.images + "/benign"
+    MALIGNANT_TOP_LEVEL_PATH = args.images + "/malignant"
+
+
     # Establish logging
     logs_path = args.job_dir + '/logs/' + datetime.now().isoformat()
 
@@ -45,17 +49,45 @@ def train_model(args):
 
     # Train/test split according to config
     patient_split = DotMap(patient_train_test_split(
-        args.images + "/benign",
-        args.images + "/malignant",
+        BENIGN_TOP_LEVEL_PATH,
+        MALIGNANT_TOP_LEVEL_PATH,
         config.train_split,
         config.random_seed
     ))
 
     image_data_generator = ImageDataGenerator(**config.image_preprocessing.toDict())
 
+    training_sample_generator = PatientSampleGenerator(
+        patient_split.train,
+        BENIGN_TOP_LEVEL_PATH,
+        BENIGN_TOP_LEVEL_PATH,
+        manifest,
+        target_shape = config.target_shape,
+        batch_size = config.batch_size,
+        image_type = image_type,
+        image_data_generator = image_data_generator,
+        timestamp = timestamp,
+        kill_on_last_patient = True)
+
+    test_sample_generator = PatientSampleGenerator(
+        test_partition,
+        benign_top_level_path,
+        malignant_top_level_path,
+        manifest,
+        target_shape = target_shape,
+        batch_size = config.batch_size,
+        image_type = image_type,
+        image_data_generator = image_data_generator,
+        timestamp = timestamp,
+        kill_on_last_patient = True)
+        
+
     # Load the model specified in config
     model = import_module("src.models.{0}".format(config.model)).get_model(config)
     
+    model.fit_generator(
+
+    )
     # Train the provided model according to the configuration
     # Fail on model load failure
 

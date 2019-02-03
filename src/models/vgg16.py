@@ -6,4 +6,3 @@ def get_model(config):
         weights='imagenet',
         input_shape=config.input_shape,
         pooling=config.pooling)
-

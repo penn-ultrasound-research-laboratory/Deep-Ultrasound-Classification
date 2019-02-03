@@ -5,9 +5,6 @@ pooling: avg
 random_seed: 36
 train_split: 0.9  # training/validation ratio
 batch_size: 32
-num_hidden: 128
-metric: cosine
-num_epoch: 1000
 optimizer: rmsp
 learning_rate: 1.0e-4
 decay_rate: 0.97
@@ -18,3 +15,4 @@ image_preprocessing:
   featurewise_std_normalization: True
   horizontal_flip: True
   vertical_flip: True
+image_mode: GRAYSCALE
