@@ -2,7 +2,11 @@ import tensorflow as tf
 import json
 import yaml
 
+
 from dotmap import DotMap
+from datetime import datetime
+from importlib import import_module
+
 from tensorflow.python.lib.io import file_io
 from tensorflow.python.framework.errors_impl import NotFoundError
 from src.utilities.partition.patient_partition import patient_train_test_split
@@ -12,7 +16,10 @@ DEFAULT_CONFIG = "src/config/default.yaml"
 
 def train_model(args):
 
-    # Load the configuration file yaml file, if provided.
+    # Establish logging
+    logs_path = args.job_dir + '/logs/' + datetime.now().isoformat()
+
+    # Load the configuration file yaml file if provided
     config_file = default_none(args.config, DEFAULT_CONFIG)
     try:
         with file_io.FileIO(config_file, mode='r') as stream:
@@ -35,16 +42,7 @@ def train_model(args):
         print("Unable to load manifest file: {0}".format(args.manifest))
         return
 
-    # logs_path = job_dir + '/logs/' + datetime.now().isoformat()
-    # print('-----------------------')
-    # print('Using train_file located at {}'.format(train_file))
-    # print('Using logs_path located at {}'.format(logs_path))
-    # print('-----------------------')
-    # file_stream = 
-    # x_train, y_train, x_test, y_test  = pickle.load(file_stream)
-    
-    print(config)
-
+    # Train/test split according to config
     patient_split = DotMap(patient_train_test_split(
         args.images + "/benign",
         args.images + "/malignant",
@@ -52,22 +50,20 @@ def train_model(args):
         config.random_seed
     ))
 
-    print(patient_split.test)
-
-
-
-    # Load the training manifest
-    # Fail on error
-
-    # Partition the training image set based on the configuration
-    # Update patient partition utility to use random seed
-    # Configuration file will store random seed --> patient partition
-
+    # Load the model specified in config
+    model = import_module("src.models.{0}".format(config.model)).get_model(config)
+    
     # Train the provided model according to the configuration
     # Fail on model load failure
 
     # Evaluate the model
 
     # Save the model
+    # model.save(config.identifier)
+    
+    # # Save the model on GC storage
+    # with file_io.FileIO(config.identifier, mode='r') as input_f:
+    #     with file_io.FileIO(args.job_dir + "/{0}".format(config.identifier), mode='w+') as output_f:
+    #         output_f.write(input_f.read())
 
     return

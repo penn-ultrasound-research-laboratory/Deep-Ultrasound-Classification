@@ -1,3 +1,7 @@
+identifier: default
+model: vgg16
+input_shape: [32, 32, 3]
+pooling: avg
 random_seed: 36
 train_split: 0.9  # training/validation ratio
 batch_size: 100
