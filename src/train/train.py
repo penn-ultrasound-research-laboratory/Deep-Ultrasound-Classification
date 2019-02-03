@@ -9,6 +9,7 @@ from importlib import import_module
 
 from tensorflow.python.lib.io import file_io
 from tensorflow.python.framework.errors_impl import NotFoundError
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from src.utilities.partition.patient_partition import patient_train_test_split
 from src.utilities.general.general import default_none
 
@@ -49,6 +50,8 @@ def train_model(args):
         config.train_split,
         config.random_seed
     ))
+
+    image_data_generator = ImageDataGenerator(**config.image_preprocessing.toDict())
 
     # Load the model specified in config
     model = import_module("src.models.{0}".format(config.model)).get_model(config)

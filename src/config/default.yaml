@@ -1,14 +1,10 @@
 identifier: default
 model: vgg16
-input_shape: [32, 32, 3]
+input_shape: [48, 48, 3]
 pooling: avg
 random_seed: 36
 train_split: 0.9  # training/validation ratio
-batch_size: 100
-train_embedding: true
-cell: sru  # simplified recursion unit
-init_state_type: var
-dilation: [1, 2, 4, 8, 16, 32]
+batch_size: 32
 num_hidden: 128
 metric: cosine
 num_epoch: 1000
@@ -17,3 +13,8 @@ learning_rate: 1.0e-4
 decay_rate: 0.97
 test_interval: 1
 loss: logistic
+image_preprocessing:
+  featurewise_center: True
+  featurewise_std_normalization: True
+  horizontal_flip: True
+  vertical_flip: True
