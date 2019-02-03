@@ -12,8 +12,7 @@ import numpy as np
 
 
 def train_test_split_indices(
-    train_split_percentage, 
-    test_split_percentage, 
+    train_split, 
     number_samples,
     random_seed=None):
     """Return train/test/validate indices for a given number of samples
@@ -25,9 +24,8 @@ def train_test_split_indices(
     validation indices
 
     Arguments:
-        train_split_percentage               The percentage to use for the train split (0 < x < 1.0)
-        test_split_percentage                The percentage to use for the test split (0 < x < 1.0)
-        number_samples                       Integer number of samples to split
+        train_split                         The percentage to use for the train split (0 < x < 1.0)
+        number_samples                      Integer number of samples to split
 
     Returns:
         Length 3 tuple where each value is a list of indices:
@@ -38,34 +36,26 @@ def train_test_split_indices(
         )
     """
 
+    # Optionally set random seed
     if random_seed is not None:
          np.random.seed(random_seed)
 
     # Training indices
     train_indices = np.random.choice(
         number_samples,
-        floor(train_split_percentage * number_samples),
+        floor(train_split * number_samples),
         replace=False).tolist()
-
-    # Non-training indices
-    non_train_indices = [index for index in np.arange(number_samples) if index not in train_indices]
 
     # Test indices
-    test_indices = np.random.choice(
-        non_train_indices,
-        floor(test_split_percentage * number_samples),
-        replace=False).tolist()
+    test_indices = [index for index in np.arange(number_samples) if index not in train_indices]
 
-    # Validation indices (optional)
-    validation_indices = [index for index in np.arange(number_samples) if index not in train_indices + test_indices]
-
-    return (train_indices, test_indices, validation_indices)
+    return (train_indices, test_indices)
 
 
-def patient_train_test_validation_split(
-        benign_top_level_path,
-        malignant_top_level_path,
-        include_validation=False,
+def patient_train_test_split(
+        benign_path,
+        malignant_path,
+        train_split,
         random_seed=None):
     """Allocate patients to training, test, validation sets.
 
@@ -74,66 +64,41 @@ def patient_train_test_validation_split(
     the ratios specified in a constants file.
 
     Arguments:
-        benign_top_level_path                absolute path to benign top level folder
-        malignant_top_level_path             absolute path to malignant top level folder
-
-    Optional:
-        ignore_validation                    Only split the dataset into training/test. No validation partition.
+        benign_path                absolute path to benign top level folder
+        malignant_path             absolute path to malignant top level folder
 
     Returns:
         Dictionary containing arrays: benign_train, benign_test, benign_cval,
             malignant_train, malignant_test, malignant_cval
     """
 
-    malignant_patients = [name for name in os.listdir(malignant_top_level_path)
-                          if os.path.isdir(os.path.join(malignant_top_level_path, name))]
-
-    benign_patients = [name for name in os.listdir(benign_top_level_path)
-                       if os.path.isdir(os.path.join(benign_top_level_path, name))]
+    malignant_patients = [_ for _ in os.listdir(malignant_path) if os.path.isdir(os.path.join(malignant_path, _))]
+    benign_patients = [_ for _ in os.listdir(benign_path) if os.path.isdir(os.path.join(benign_path, _))]
 
     num_malignant = len(malignant_patients)
     num_benign = len(benign_patients)
 
-    train_indices, test_indices, validation_indices = train_test_split_indices(
-        TRAIN_TEST_VALIDATION_SPLIT["TRAIN"],
-        TRAIN_TEST_VALIDATION_SPLIT["TEST"],
+    train_indices_mal, test_indices_mal = train_test_split_indices(
+        train_split,
         num_malignant,
         random_seed=random_seed)
 
+    train_indices_ben, test_indices_ben = train_test_split_indices(
+        train_split,
+        num_benign,
+        random_seed=random_seed)
+
     # Partition always contains train/test
-    patient_dataset = {
-        "malignant_train": [(malignant_patients[index], TUMOR_MALIGNANT) for index in train_indices],
-        "malignant_test": [(malignant_patients[index], TUMOR_MALIGNANT) for index in test_indices]
+    patient_split = {
+        "benign_train": [(benign_patients[_], TUMOR_BENIGN) for _ in train_indices_ben],
+        "benign_test": [(benign_patients[_], TUMOR_BENIGN) for _ in test_indices_ben],
+        "malignant_train": [(malignant_patients[_], TUMOR_MALIGNANT) for _ in train_indices_mal],
+        "malignant_test": [(malignant_patients[_], TUMOR_MALIGNANT) for _ in test_indices_mal]
     }
 
-    # Optionally define validation as a separate partition or append to test partition
-    if include_validation:
-        patient_dataset["malignant_cval"] = [
-            (malignant_patients[index], TUMOR_MALIGNANT) for index in validation_indices]
-    else:
-        patient_dataset["malignant_test"] += [
-            (malignant_patients[index], TUMOR_MALIGNANT) for index in validation_indices]
-
-    # TODO: Code reusability here obviously poor. Split into generic helper method.
-
-    # Number of benign patients differs from number malignant. Generate correctly size index set.
-    if num_benign != num_malignant:
-
-        train_indices, test_indices, validation_indices = train_test_split_indices(
-            TRAIN_TEST_VALIDATION_SPLIT["TRAIN"],
-            TRAIN_TEST_VALIDATION_SPLIT["TEST"],
-            num_benign)
-
-    patient_dataset.update({
-        "benign_train": [(benign_patients[index], TUMOR_BENIGN) for index in train_indices],
-        "benign_test": [(benign_patients[index], TUMOR_BENIGN) for index in test_indices]
+    patient_split.update({
+        "train": patient_split["benign_train"] + patient_split["malignant_train"],
+        "test": patient_split["benign_test"] + patient_split["malignant_test"]
     })
 
-    if include_validation:
-        patient_dataset["benign_cval"] = [
-            (benign_patients[index], TUMOR_BENIGN) for index in validation_indices]
-    else:
-        patient_dataset["benign_test"] += [
-            (benign_patients[index], TUMOR_BENIGN) for index in validation_indices]
-
-    return patient_dataset
+    return patient_split

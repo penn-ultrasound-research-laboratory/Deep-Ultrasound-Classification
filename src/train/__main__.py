@@ -10,7 +10,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "-I",
         "--images",
-        help="Path to training data images",
+        help="Path to training data images top level directory",
         required=True
     )
 

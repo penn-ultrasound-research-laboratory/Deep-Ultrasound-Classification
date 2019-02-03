@@ -2,9 +2,10 @@ import tensorflow as tf
 import json
 import yaml
 
+from dotmap import DotMap
 from tensorflow.python.lib.io import file_io
 from tensorflow.python.framework.errors_impl import NotFoundError
-from src.utilities.partition.patient_partition import *
+from src.utilities.partition.patient_partition import patient_train_test_split
 from src.utilities.general.general import default_none
 
 DEFAULT_CONFIG = "src/config/default.yaml"
@@ -15,15 +16,13 @@ def train_model(args):
     config_file = default_none(args.config, DEFAULT_CONFIG)
     try:
         with file_io.FileIO(config_file, mode='r') as stream:
-            exp_config = yaml.load(stream)
+            config = DotMap(yaml.load(stream))
     except NotFoundError as _:
         print("Configuration file not found: {0}".format(config_file))
         return
     except Exception as _:
         print("Unable to load configuration file: {0}".format(config_file))
         return
-
-    print(exp_config)
 
     # Load the manifest file
     try:
@@ -44,9 +43,16 @@ def train_model(args):
     # file_stream = 
     # x_train, y_train, x_test, y_test  = pickle.load(file_stream)
     
+    print(config)
 
+    patient_split = DotMap(patient_train_test_split(
+        args.images + "/benign",
+        args.images + "/malignant",
+        config.train_split,
+        config.random_seed
+    ))
 
-    print(exp_config)
+    print(patient_split.test)
 
 
 
