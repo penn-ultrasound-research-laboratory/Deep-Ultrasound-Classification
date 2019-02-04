@@ -21,6 +21,18 @@ class IMAGE_TYPE(Enum):
     COLOR = 'COLOR'
     ALL = 'ALL'
 
+
+def string_to_image_type(str):
+    if str == "GRAYSCALE":
+        return IMAGE_TYPE.GRAYSCALE
+    elif str == "COLOR":
+        return IMAGE_TYPE.COLOR
+    elif str == "ALL":
+        return IMAGE_TYPE.ALL
+    else:
+        raise ValueError("Not a valid image type")
+
+
 def image_type_to_opencv_color_mode(image_type):
     """Converts image type (Grayscale/Color) to OpenCV image type"""
     if image_type == IMAGE_TYPE.COLOR.value:

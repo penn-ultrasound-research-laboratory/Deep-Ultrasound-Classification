@@ -2,7 +2,6 @@ import tensorflow as tf
 import json
 import yaml
 
-
 from dotmap import DotMap
 from datetime import datetime
 from importlib import import_module
@@ -10,6 +9,9 @@ from importlib import import_module
 from tensorflow.python.lib.io import file_io
 from tensorflow.python.framework.errors_impl import NotFoundError
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.optimizers import SGD
+from src.constants.ultrasoundConstants import string_to_image_type
+from src.pipeline.patientsample.patient_sample_generator import PatientSampleGenerator
 from src.utilities.partition.patient_partition import patient_train_test_split
 from src.utilities.general.general import default_none
 
@@ -56,7 +58,6 @@ def train_model(args):
 
     image_data_generator = ImageDataGenerator(**config.image_preprocessing.toDict())
 
-    # THESE ARE INCORRECT
     training_sample_generator = PatientSampleGenerator(
         patient_split.train,
         BENIGN_TOP_LEVEL_PATH,
@@ -64,31 +65,42 @@ def train_model(args):
         manifest,
         target_shape = config.target_shape,
         batch_size = config.batch_size,
-        image_type = image_type,
+        image_type = string_to_image_type(config.image_type),
         image_data_generator = image_data_generator,
         kill_on_last_patient = True,
         use_categorical = True)
 
-    test_sample_generator = PatientSampleGenerator(
-        test_partition,
-        benign_top_level_path,
-        malignant_top_level_path,
-        manifest,
-        target_shape = target_shape,
-        batch_size = config.batch_size,
-        image_type = image_type,
-        image_data_generator = image_data_generator,
-        kill_on_last_patient = True,
-        use_categorical = True)
+    print(training_sample_generator)
+
+    # test_sample_generator = PatientSampleGenerator(
+    #     test_partition,
+    #     benign_top_level_path,
+    #     malignant_top_level_path,
+    #     manifest,
+    #     target_shape = target_shape,
+    #     batch_size = config.batch_size,
+    #     image_type = image_type,
+    #     image_data_generator = image_data_generator,
+    #     kill_on_last_patient = True,
+    #     use_categorical = True)
         
 
     # Load the model specified in config
     model = import_module("src.models.{0}".format(config.model)).get_model(config)
-    
-    model.fit_generator(
 
+    model.summary()
+
+    model.compile(
+        SGD(),
+        loss='categorical_crossentropy',
+        metrics=['accuracy'])
+
+    model.fit_generator(
+        next(training_sample_generator),
+        steps_per_epoch=training_sample_generator.total_num_cleared_frames,
+        epochs = 2
     )
-    # Train the provided model according to the configuration
+    # Train the provided model according to the coxnfiguration
     # Fail on model load failure
 
     # Evaluate the model
