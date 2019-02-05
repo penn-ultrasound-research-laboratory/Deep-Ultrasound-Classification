@@ -2,7 +2,7 @@ identifier: default
 image_type: GRAYSCALE
 model: vgg16
 input_shape: [48, 48, 3]
-pooling: avg
+pooling: max
 random_seed: 36
 train_split: 0.9  # training/validation ratio
 batch_size: 32
@@ -10,9 +10,12 @@ optimizer: rmsp
 learning_rate: 1.0e-4
 decay_rate: 0.97
 test_interval: 1
-loss: logistic
+loss: binary_crossentropy
 image_preprocessing:
   featurewise_center: True
   featurewise_std_normalization: True
   horizontal_flip: True
   vertical_flip: True
+sample_to_batch_config:
+  upscale_to_target: True
+  always_sample_center: False # Randomized sampling

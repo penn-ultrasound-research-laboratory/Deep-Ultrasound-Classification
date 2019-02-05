@@ -9,7 +9,7 @@ from importlib import import_module
 from tensorflow.python.lib.io import file_io
 from tensorflow.python.framework.errors_impl import NotFoundError
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
-from tensorflow.keras.optimizers import SGD
+from tensorflow.keras.optimizers import Adam
 from src.constants.ultrasoundConstants import string_to_image_type
 from src.pipeline.patientsample.patient_sample_generator import PatientSampleGenerator
 from src.utilities.partition.patient_partition import patient_train_test_split
@@ -63,14 +63,13 @@ def train_model(args):
         BENIGN_TOP_LEVEL_PATH,
         BENIGN_TOP_LEVEL_PATH,
         manifest,
-        target_shape = config.target_shape,
+        target_shape = config.input_shape,
         batch_size = config.batch_size,
         image_type = string_to_image_type(config.image_type),
         image_data_generator = image_data_generator,
         kill_on_last_patient = True,
-        use_categorical = True)
-
-    print(training_sample_generator)
+        use_categorical = True,
+        sample_to_batch_config = config.sample_to_batch_config.toDict())
 
     # test_sample_generator = PatientSampleGenerator(
     #     test_partition,
@@ -88,11 +87,11 @@ def train_model(args):
     # Load the model specified in config
     model = import_module("src.models.{0}".format(config.model)).get_model(config)
 
-    model.summary()
+    # model.summary()
 
     model.compile(
-        SGD(),
-        loss='categorical_crossentropy',
+        Adam(),
+        loss=config.loss,
         metrics=['accuracy'])
 
     model.fit_generator(

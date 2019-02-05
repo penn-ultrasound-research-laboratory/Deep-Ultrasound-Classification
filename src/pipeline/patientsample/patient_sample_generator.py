@@ -74,7 +74,8 @@ class PatientSampleGenerator:
                  image_type=IMAGE_TYPE.ALL,
                  target_shape=None,
                  kill_on_last_patient=False,
-                 use_categorical=False):
+                 use_categorical=False,
+                 sample_to_batch_config=None):
 
         self.raw_patient_list = patient_list
         self.manifest = manifest
@@ -86,6 +87,7 @@ class PatientSampleGenerator:
         self.target_shape = target_shape
         self.kill_on_last_patient = kill_on_last_patient
         self.use_categorical = use_categorical
+        self.sample_to_batch_config = sample_to_batch_config
 
         # Find all the patientIds with at least one frame in the specified IMAGE_TYPE
         # Patient list is unfiltered if IMAGE_TYPE.
@@ -198,14 +200,21 @@ class PatientSampleGenerator:
                 self.__transition_to_next_patient_frame_state(is_last_frame, is_last_patient)
                 continue
 
-            raw_image_batch = sample_to_batch(
-                loaded_image,
-                target_shape=self.target_shape,
-                upscale_to_target=True,
-                batch_size=self.batch_size,
-                always_sample_center=True)
+            if self.sample_to_batch_config is None:
+                raw_image_batch = sample_to_batch(
+                    loaded_image,
+                    target_shape=self.target_shape,
+                    batch_size=self.batch_size,
+                    upscale_to_target=True,
+                    always_sample_center=False)
+            else:
+                raw_image_batch = sample_to_batch(
+                    loaded_image,
+                    target_shape=self.target_shape,
+                    batch_size=self.batch_size,
+                    **self.sample_to_batch_config)
 
-            # LOGGER.info("Raw Image Batch shape: %s", raw_image_batch.shape)
+            # print("Raw Image Batch shape: {0}".format(raw_image_batch.shape))
 
             # Convert the tumor string label to integer label
             frame_label = tumor_integer_label(self.patient_frames[self.frame_index][TUMOR_TYPE_LABEL])
