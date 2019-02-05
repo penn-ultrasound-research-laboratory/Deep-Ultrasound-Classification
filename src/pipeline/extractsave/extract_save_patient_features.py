@@ -12,12 +12,12 @@ from src.pipeline.patientsample.patient_sample_generator import PatientSampleGen
 
 from src.constants.exceptions.customExceptions import ExtractSavePatientFeatureException
 
-from src.constants.ultrasoundConstants import (
+from src.constants.ultrasound import (
     IMAGE_TYPE,
     NUMBER_CHANNELS_COLOR,
     NUMBER_CHANNELS_GRAYSCALE)
 
-from src.constants.modelConstants import (
+from src.constants.model import (
     DEFAULT_BATCH_SIZE,
     RESNET50_REQUIRED_NUMBER_CHANNELS,
     SAMPLE_WIDTH,

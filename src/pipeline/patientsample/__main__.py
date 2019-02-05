@@ -7,7 +7,7 @@ import uuid
 import numpy as np
 
 from src.pipeline.patientsample.patient_sample_generator import PatientSampleGenerator
-from src.constants.ultrasoundConstants import IMAGE_TYPE
+from src.constants.ultrasound import IMAGE_TYPE
 
 from keras.preprocessing.image import ImageDataGenerator
 

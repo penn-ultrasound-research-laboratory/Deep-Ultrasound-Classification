@@ -1,8 +1,8 @@
 import argparse
 import cv2
 
-from src.constants.ultrasoundConstants import IMAGE_TYPE
-from src.utilities.ocr.ocr_utilities import isolate_text
+from src.constants.ultrasound import IMAGE_TYPE
+from src.utilities.ocr.ocr import isolate_text
 
 # construct the argument parse and parse the arguments
 parser = argparse.ArgumentParser()

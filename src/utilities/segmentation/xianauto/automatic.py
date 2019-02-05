@@ -8,8 +8,8 @@ import numpy as np
 import scipy.stats as scp
 import matplotlib.pyplot as plt
 
-from src.constants.ultrasoundConstants import IMAGE_TYPE
-from src.constants.AutomaticSegmentationConstants import (
+from src.constants.ultrasound import IMAGE_TYPE
+from src.constants.automatic import (
     FIND_SEED_POINT_STOPPING_CRITERION,
     FIND_SEED_POINT_MAXIMUM_ITERATIONS,
     FIND_SEED_POINT_NUMBER_DIRECTIONS,

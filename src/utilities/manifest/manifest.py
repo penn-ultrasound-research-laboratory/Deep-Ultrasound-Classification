@@ -1,7 +1,7 @@
 import json
 import os
 
-from src.constants.ultrasoundConstants import (
+from src.constants.ultrasound import (
     FRAME_LABEL,
     IMAGE_TYPE,
     IMAGE_TYPE_LABEL,

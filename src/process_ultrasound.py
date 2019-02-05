@@ -9,13 +9,13 @@ from datetime import datetime
 import cv2
 import numpy as np
 
-from src.utilities.image.image_utilities import determine_image_type
-from src.utilities.segmentation.brute.grayscale_segmentation import load_select_save_scan_window
-from src.utilities.segmentation.brute.color_segmentation import load_select_color_image_focus
+from src.utilities.image.image import determine_image_type
+from src.utilities.segmentation.brute.grayscale import load_select_save_scan_window
+from src.utilities.segmentation.brute.color import load_select_color_image_focus
 
-from src.utilities.ocr.ocr_utilities import isolate_text
+from src.utilities.ocr.ocr import isolate_text
 
-from src.constants.ultrasoundConstants import (
+from src.constants.ultrasound import (
     FOCUS_HASH_LABEL,
     FRAME_LABEL,
     HSV_COLOR_THRESHOLD,

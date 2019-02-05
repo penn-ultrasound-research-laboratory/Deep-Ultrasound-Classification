@@ -4,7 +4,7 @@ import uuid
 
 from src.pipeline.extractsave.extract_save_patient_features import extract_save_patient_features
 
-from src.constants.modelConstants import (
+from src.constants.model import (
     DEFAULT_BATCH_SIZE,
     RESNET50_REQUIRED_NUMBER_CHANNELS,
     SAMPLE_WIDTH,
@@ -14,7 +14,7 @@ from src.constants.modelConstants import (
     RESNET_50_HEIGHT,
     RESNET_50_WIDTH)
 
-from src.constants.ultrasoundConstants import (
+from src.constants.ultrasound import (
     IMAGE_TYPE,
     NUMBER_CHANNELS_COLOR,
     NUMBER_CHANNELS_GRAYSCALE)

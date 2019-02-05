@@ -10,7 +10,7 @@ import numpy as np
 from PIL import Image
 
 # import the necessary packages
-from src.constants.ultrasoundConstants import (
+from src.constants.ultrasound import (
 	IMAGE_TYPE,
 	READOUT_ABBREVS as RA,
 	WALL_FILTER_MODES

@@ -3,7 +3,7 @@ import cv2
 import logging
 import uuid
 import numpy as np
-from src.constants.ultrasoundConstants import IMAGE_TYPE
+from src.constants.ultrasound import IMAGE_TYPE
 from matplotlib import pyplot
 
 

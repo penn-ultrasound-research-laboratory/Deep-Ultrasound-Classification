@@ -1,10 +1,10 @@
 import unittest
 
-import src.utilities.image.image_utilities as util
+import src.utilities.image.image as util
 import numpy as np
 
 from unittest.mock import MagicMock, ANY
-from src.constants.ultrasoundConstants import IMAGE_TYPE
+from src.constants.ultrasound import IMAGE_TYPE
 
 
 class Test_TestDetermineImageType(unittest.TestCase):

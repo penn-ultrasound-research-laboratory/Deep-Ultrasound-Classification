@@ -3,8 +3,8 @@ import argparse
 
 from math import floor
 
-from src.constants.modelConstants import TRAIN_TEST_VALIDATION_SPLIT
-from src.constants.ultrasoundConstants import (
+from src.constants.model import TRAIN_TEST_VALIDATION_SPLIT
+from src.constants.ultrasound import (
     TUMOR_BENIGN,
     TUMOR_MALIGNANT)
 

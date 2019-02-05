@@ -1,8 +1,8 @@
 import unittest
 
-import src.utilities.manifest.manifest_utilities as util
+import src.utilities.manifest.manifest as util
 
-from src.constants.ultrasoundConstants import (
+from src.constants.ultrasound import (
     FOCUS_HASH_LABEL,
     IMAGE_TYPE,
     IMAGE_TYPE_LABEL
