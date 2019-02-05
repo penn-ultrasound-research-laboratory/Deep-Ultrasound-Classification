@@ -1,6 +1,6 @@
 from __future__ import print_function
-from constants.ultrasoundConstants import IMAGE_TYPE
-from constants.modelConstants import TRAIN_TEST_VALIDATION_SPLIT
+from constants.ultrasound import IMAGE_TYPE
+from constants.model import TRAIN_TEST_VALIDATION_SPLIT
 from math import floor
 import keras, argparse
 from keras.layers import Dense, Flatten

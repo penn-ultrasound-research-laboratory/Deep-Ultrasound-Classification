@@ -3,8 +3,8 @@ import cv2
 import uuid
 import numpy as np
 
-from src.constants.ultrasoundConstants import HSV_COLOR_THRESHOLD
-from src.utilities.image.image_utilities import center_crop_to_target_padding
+from src.constants.ultrasound import HSV_COLOR_THRESHOLD
+from src.utilities.image.image import center_crop_to_target_padding
 
 
 def get_color_image_focus(

@@ -7,9 +7,9 @@ import uuid
 import numpy as np
 import matplotlib.pyplot as plt
 
-import src.utilities.manifest.manifest_utilities as mu
+import src.utilities.manifest.manifest as mu
 
-from src.constants.ultrasoundConstants import (
+from src.constants.ultrasound import (
     image_type_to_opencv_color_mode,
     IMAGE_TYPE,
     IMAGE_TYPE_LABEL,
@@ -19,14 +19,14 @@ from src.constants.ultrasoundConstants import (
     FRAME_LABEL,
     SCALE_LABEL)
 
-from src.constants.modelConstants import (
+from src.constants.model import (
     DEFAULT_BATCH_SIZE,
     SAMPLE_WIDTH,
     SAMPLE_HEIGHT)
 
-from src.constants.ultrasoundConstants import tumor_integer_label
+from src.constants.ultrasound import tumor_integer_label
 from src.constants.exceptions.customExceptions import PatientSampleGeneratorException
-from src.utilities.image.image_utilities import sample_to_batch
+from src.utilities.image.image import sample_to_batch
 
 from keras.utils import to_categorical
 

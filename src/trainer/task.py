@@ -10,7 +10,7 @@ from tensorflow.python.lib.io import file_io
 from tensorflow.python.framework.errors_impl import NotFoundError
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.optimizers import Adam
-from src.constants.ultrasoundConstants import string_to_image_type
+from src.constants.ultrasound import string_to_image_type
 from src.pipeline.patientsample.patient_sample_generator import PatientSampleGenerator
 from src.utilities.partition.patient_partition import patient_train_test_split
 from src.utilities.general.general import default_none

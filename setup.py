@@ -7,6 +7,6 @@ setup(name="example5",
   description="Ultrasound research repository",
   author="Matthew Goodman",
   author_email="mattgoodman13@gmail.com",
-  license="MIT",
+  license="BSD3",
   install_requires=[],
   zip_safe=False)

@@ -6,17 +6,17 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 
-from src.utilities.segmentation.xianauto.automatic_segmentation import get_ROI_debug
+from src.utilities.segmentation.xianauto.automatic import get_ROI_debug
 
-from src.constants.ultrasoundConstants import HSV_COLOR_THRESHOLD
-from src.constants.ultrasoundConstants import (
+from src.constants.ultrasound import HSV_COLOR_THRESHOLD
+from src.constants.ultrasound import (
     IMAGE_TYPE,
     IMAGE_TYPE_LABEL,
     FRAME_LABEL,
     FRAME_DEFAULT_ROW_CROP_FOR_SCAN_SELECTION,
     FRAME_DEFAULT_COL_CROP_FOR_SCAN_SELECTION)
 
-from src.utilities.segmentation.brute.grayscale_segmentation import select_scan_window_from_frame
+from src.utilities.segmentation.brute.grayscale import select_scan_window_from_frame
 from src.pipeline.patientsample.patient_sample_generator import PatientSampleGenerator
 
 
