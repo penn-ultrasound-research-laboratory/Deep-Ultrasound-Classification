@@ -2,7 +2,7 @@ import argparse
 import logging
 import uuid
 
-from src.pipeline.generator.extract_save_patient_features import extract_save_patient_features
+from src.pipeline.extractsave.extract_save_patient_features import extract_save_patient_features
 
 from src.constants.modelConstants import (
     DEFAULT_BATCH_SIZE,

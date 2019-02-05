@@ -13,7 +13,7 @@ from keras.preprocessing.image import ImageDataGenerator
 
 dirname = os.path.dirname(__file__)
 
-with open(os.path.abspath("../ProcessedDatasets/2018-08-25/manifest_2018-08-25_18-52-25.json"), "r") as fp:
+with open(os.path.abspath("../Datasets/V2.0_Processed/manifest.json"), "r") as fp:
     manifest = json.load(fp)
 
 logging.basicConfig(level=logging.INFO, filename="./main_output.log")
@@ -35,14 +35,12 @@ patient_sample_generator = next(PatientSampleGenerator([
     ("01PER2043096", "BENIGN"),
     ("79BOY3049163", "MALIGNANT"),
     ("93KUD3041008", "MALIGNANT")],
-    os.path.join(dirname, "../../100_Cases/ComprehensiveMaBenign/Benign"),
-    os.path.join(
-    dirname, "../../100_Cases/ComprehensiveMaBenign/Malignant"),
+    os.path.join(dirname, "../Datasets/V2.0_Processed/Benign"),
+    os.path.join(dirname, "../Datasets/V2.0_Processed/Malignant"),
     manifest,
     target_shape=[50, 50],
     image_type=IMAGE_TYPE.ALL,
     image_data_generator=image_data_generator,
-    timestamp="2018-08-25_18-52-25",
     batch_size=BATCH_SIZE,
     kill_on_last_patient=True
 ))

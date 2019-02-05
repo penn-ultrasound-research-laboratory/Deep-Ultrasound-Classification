@@ -16,7 +16,6 @@ from src.constants.ultrasoundConstants import (
     TUMOR_BENIGN,
     TUMOR_MALIGNANT,
     TUMOR_TYPE_LABEL,
-    FOCUS_HASH_LABEL,
     FRAME_LABEL,
     SCALE_LABEL)
 
@@ -51,12 +50,11 @@ class PatientSampleGenerator:
         image_data_generator                 preprocessing generator to run on input images
         image_type                           type of image frames to process (IMAGE_TYPE Enum). i.e. grayscale or color
         target_shape                         array containing target shape to use for output samples
-        timestamp                            timestamp string to append in focus directory path
 
         kill_on_last_patient                 Cycle through all matching patients exactly once. Forces generator to act
                                                 like single-shot iterator
 
-        use_categorical                      Output class labels one-hot categorical matrix instead of dense numerical
+        use_categorical                     Output class labels one-hot categorical matrix instead of dense numerical
 
     Returns:
         Tuple containing numpy arrays ((batch_size, (target_shape)), [labels]) 
@@ -75,21 +73,21 @@ class PatientSampleGenerator:
                  image_data_generator=None,
                  image_type=IMAGE_TYPE.ALL,
                  target_shape=None,
-                 timestamp=None,
                  kill_on_last_patient=False,
-                 use_categorical=False):
+                 use_categorical=False,
+                 sample_to_batch_config=None):
 
         self.raw_patient_list = patient_list
         self.manifest = manifest
         self.benign_top_level_path = benign_top_level_path
         self.malignant_top_level_path = malignant_top_level_path
         self.image_type = image_type
-        self.timestamp = timestamp
         self.image_data_generator = image_data_generator
         self.batch_size = batch_size
         self.target_shape = target_shape
         self.kill_on_last_patient = kill_on_last_patient
         self.use_categorical = use_categorical
+        self.sample_to_batch_config = sample_to_batch_config
 
         # Find all the patientIds with at least one frame in the specified IMAGE_TYPE
         # Patient list is unfiltered if IMAGE_TYPE.
@@ -166,7 +164,13 @@ class PatientSampleGenerator:
     def __load_current_frame_image(self, current_frame_color):
         color_mode = image_type_to_opencv_color_mode(current_frame_color)
 
-        loaded_image = cv2.imread(self.patient_frames[self.frame_index][FOCUS_HASH_LABEL], color_mode)
+        if self.patient_frames[self.frame_index][TUMOR_TYPE_LABEL] is TUMOR_BENIGN:
+            type_path = self.benign_top_level_path 
+        else:
+            type_path = self.malignant_top_level_path 
+
+        im_path = "{0}/{1}/{2}".format(type_path, self.patient_id, self.patient_frames[self.frame_index][FRAME_LABEL])
+        loaded_image = cv2.imread(im_path, color_mode)
 
         # TODO: Verify that this makes sense with channel ordering. I thought OpenCV
         # typically used GBR and not RGB
@@ -191,19 +195,26 @@ class PatientSampleGenerator:
                 # Stored image is corrupted. Skip to next frame.
                 LOGGER.info("Skipping due to corruption: %s | frame: %s",
                             self.patient_id,
-                            self.patient_frames[self.frame_index][FOCUS_HASH_LABEL])
+                            self.patient_frames[self.frame_index][FRAME_LABEL])
 
                 self.__transition_to_next_patient_frame_state(is_last_frame, is_last_patient)
                 continue
 
-            raw_image_batch = sample_to_batch(
-                loaded_image,
-                target_shape=self.target_shape,
-                upscale_to_target=True,
-                batch_size=self.batch_size,
-                always_sample_center=True)
+            if self.sample_to_batch_config is None:
+                raw_image_batch = sample_to_batch(
+                    loaded_image,
+                    target_shape=self.target_shape,
+                    batch_size=self.batch_size,
+                    upscale_to_target=True,
+                    always_sample_center=False)
+            else:
+                raw_image_batch = sample_to_batch(
+                    loaded_image,
+                    target_shape=self.target_shape,
+                    batch_size=self.batch_size,
+                    **self.sample_to_batch_config)
 
-            LOGGER.info("Raw Image Batch shape: %s", raw_image_batch.shape)
+            # print("Raw Image Batch shape: {0}".format(raw_image_batch.shape))
 
             # Convert the tumor string label to integer label
             frame_label = tumor_integer_label(self.patient_frames[self.frame_index][TUMOR_TYPE_LABEL])
@@ -223,28 +234,21 @@ class PatientSampleGenerator:
                     batch_size=self.batch_size,
                     shuffle=True)
 
-                # Output of ImageDataGenerator assigned to raw_image_batch is now preprocessed. Values will be
-                # negative in range spanning zero if mean normalization is included as part of preprocessing
-                # functions.
-
+                # Output of ImageDataGenerator assigned to raw_image_batch is now preprocessed
                 raw_image_batch = next(gen)
 
-                LOGGER.debug("Used image data generator to transform input image to shape: {}".format(
-                    raw_image_batch.shape))
+                # LOGGER.debug("Used image data generator to transform input image to shape: {}".format(
+                #     raw_image_batch.shape))
 
-            LOGGER.info("Training on patient: %s | color: %s | frame: %s",
-                        self.patient_id,
-                        current_frame_color,
-                        self.patient_frames[self.frame_index][FOCUS_HASH_LABEL])
+            # LOGGER.info("Training on patient: %s | color: %s | frame: %s",
+            #             self.patient_id,
+            #             current_frame_color,
+            #             self.patient_frames[self.frame_index][FOCUS_HASH_LABEL])
 
             if self.use_categorical:
-                yield (
-                    raw_image_batch,
-                    to_categorical(np.repeat(frame_label, self.batch_size), num_classes=2))
+                yield raw_image_batch, to_categorical(np.repeat(frame_label, self.batch_size), num_classes=2)
             else:
-                yield (
-                    raw_image_batch,
-                    np.repeat(frame_label, self.batch_size))
+                yield raw_image_batch, np.repeat(frame_label, self.batch_size)
 
             self.__transition_to_next_patient_frame_state(
                 is_last_frame, is_last_patient)

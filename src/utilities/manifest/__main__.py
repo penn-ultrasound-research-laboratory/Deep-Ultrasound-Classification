@@ -1,5 +1,5 @@
 import sys
 
-from src.utilities.manifest.manifestUtilities import merge_manifest
+from src.utilities.manifest.manifest_utilities import convert_old_manifest_to_new_format
 
-merge_manifest(sys.argv[1], sys.argv[2], sys.argv[3])
+convert_old_manifest_to_new_format(sys.argv[1], sys.argv[2])
