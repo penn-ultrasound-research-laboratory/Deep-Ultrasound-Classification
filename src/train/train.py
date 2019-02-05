@@ -87,7 +87,7 @@ def train_model(args):
     # Load the model specified in config
     model = import_module("src.models.{0}".format(config.model)).get_model(config)
 
-    # model.summary()
+    model.summary()
 
     model.compile(
         Adam(),

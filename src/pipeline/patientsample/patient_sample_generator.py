@@ -237,8 +237,8 @@ class PatientSampleGenerator:
                 # Output of ImageDataGenerator assigned to raw_image_batch is now preprocessed
                 raw_image_batch = next(gen)
 
-                LOGGER.debug("Used image data generator to transform input image to shape: {}".format(
-                    raw_image_batch.shape))
+                # LOGGER.debug("Used image data generator to transform input image to shape: {}".format(
+                #     raw_image_batch.shape))
 
             # LOGGER.info("Training on patient: %s | color: %s | frame: %s",
             #             self.patient_id,
@@ -246,13 +246,9 @@ class PatientSampleGenerator:
             #             self.patient_frames[self.frame_index][FOCUS_HASH_LABEL])
 
             if self.use_categorical:
-                yield (
-                    raw_image_batch,
-                    to_categorical(np.repeat(frame_label, self.batch_size), num_classes=2))
+                yield raw_image_batch, to_categorical(np.repeat(frame_label, self.batch_size), num_classes=2)
             else:
-                yield (
-                    raw_image_batch,
-                    np.repeat(frame_label, self.batch_size))
+                yield raw_image_batch, np.repeat(frame_label, self.batch_size)
 
             self.__transition_to_next_patient_frame_state(
                 is_last_frame, is_last_patient)
