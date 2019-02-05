@@ -90,17 +90,18 @@ def train_model(args):
     model.summary()
 
     model.compile(
-        Adam(),
+        Adam(), # default Adam parameters for now
         loss=config.loss,
         metrics=['accuracy'])
 
     model.fit_generator(
         next(training_sample_generator),
         steps_per_epoch=training_sample_generator.total_num_cleared_frames,
-        epochs = 2
+        epochs = 2, # Just for testing purposes
+        verbose = 2,
+        use_multiprocessing = True,
+        workers = 8
     )
-    # Train the provided model according to the coxnfiguration
-    # Fail on model load failure
 
     # Evaluate the model
 

@@ -1,7 +1,7 @@
 import argparse
 
 from dotmap import DotMap
-from src.train.train import train_model
+from src.trainer.task import train_model
 
 if __name__ == "__main__":
 
