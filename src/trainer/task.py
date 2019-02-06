@@ -100,7 +100,7 @@ def train_model(args):
         epochs = 2, # Just for testing purposes
         verbose = 2,
         use_multiprocessing = True,
-        workers = 8
+        workers = args.num_workers
     )
 
     # Evaluate the model
