@@ -42,6 +42,6 @@ if __name__ == "__main__":
     
     args=parser.parse_args()
     arguments= DotMap(args.__dict__)
-
+    
     # Execute the model
     train_model(arguments)

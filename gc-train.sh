@@ -26,19 +26,26 @@ MODEL_CONFIG_PATH="src/config/$CONFIG_FILE"
 NUM_WORKERS=2
 
 # Local test
-gcloud ml-engine local train --package-path "src" \
+# gcloud ml-engine local train --package-path "src" \
+#         --module-name $MAIN_TRAINER_MODULE \
+#         -- \
+#         --images $IMAGES_PATH \
+#         --manifest $MANIFEST_PATH \
+#         --config $MODEL_CONFIG_PATH \
+#         --num-workers $NUM_WORKERS
+
+
+# Production run
+gcloud ml-engine jobs submit training $JOB_NAME \
         --module-name $MAIN_TRAINER_MODULE \
+        --package-path $TRAINER_PACKAGE_PATH \
+        --scale-tier $SCALE_TIER \
+        --job-dir $JOB_DIR \
+        --region $REGION \
+        --runtime-version $runtime_version \
+        --python-version $python_version \
         -- \
-        --images=$IMAGES_PATH \
-        --manifest=$MANIFEST_PATH \
-        --config=$MODEL_CONFIG_PATH \
-        --num-workers=$NUM_WORKERS
-
-
-# $JOB_NAME \
-# --scale-tier $SCALE_TIER \
-# --package-path $TRAINER_PACKAGE_PATH \
-# --job-dir $JOB_DIR \
-# --region $REGION \
-# --runtime-version $runtime_version \
-# --python-version $python_version
+        --images $IMAGES_PATH \
+        --manifest $MANIFEST_PATH \
+        --config $MODEL_CONFIG_PATH \
+        --num-workers $NUM_WORKERS
