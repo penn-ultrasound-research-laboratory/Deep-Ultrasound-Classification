@@ -1,15 +1,16 @@
 from __future__ import print_function
+import argparse
+import numpy as np
+import os
+
 from constants.ultrasound import IMAGE_TYPE
 from constants.model import TRAIN_TEST_VALIDATION_SPLIT
 from math import floor
-import keras, argparse
-from keras.layers import Dense, Flatten
-from keras.layers import Conv2D, MaxPooling2D
-from keras.models import Sequential
-from keras.preprocessing.image import ImageDataGenerator
-import matplotlib.pylab as plt
-import numpy as np
-import os
+from tensorflow.keras.layers import Dense, Flatten
+from tensorflow.keras.layers import Conv2D, MaxPooling2D
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+
 
 
 
@@ -138,10 +139,10 @@ def preprocess_train_evaluate(path_to_manifest, image_type):
     score = model.evaluate(x_test, y_test, verbose=0)
     print('Test loss:', score[0])
     print('Test accuracy:', score[1])
-    plt.plot(range(1, 11), history.acc)
-    plt.xlabel('Epochs')
-    plt.ylabel('Accuracy')
-    plt.show()
+    # plt.plot(range(1, 11), history.acc)
+    # plt.xlabel('Epochs')
+    # plt.ylabel('Accuracy')
+    # plt.show()
 
 if __name__ == '__main__':
 

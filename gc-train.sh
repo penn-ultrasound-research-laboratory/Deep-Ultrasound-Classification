@@ -1,7 +1,7 @@
 TRAINER_PACKAGE_PATH="src"
 now=$(date +"%Y%m%d_%H%M%S")
 JOB_NAME="grayscale_train_$now"
-MAIN_TRAINER_MODULE="src.trainer.task"
+MAIN_TRAINER_MODULE="trainer.task"
 STORAGE="research-storage"
 JOB_DIR="gs://$STORAGE/$JOB_NAME"
 REGION="us-west1"
