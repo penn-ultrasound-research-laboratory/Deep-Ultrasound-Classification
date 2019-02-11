@@ -1,7 +1,7 @@
 import json
 import os
 
-from src.constants.ultrasound import (
+from constants.ultrasound import (
     FRAME_LABEL,
     IMAGE_TYPE,
     IMAGE_TYPE_LABEL,
@@ -48,6 +48,18 @@ def merge_manifest(path_to_manifest_a, path_to_manifest_b, output_path):
 
     with open(output_path, 'w') as f:
         json.dump(composite_manifest, f)
+
+
+def patient_type_lists(manifest):
+    benign = []
+    malignant = []
+    for pid in manifest.keys():
+        if manifest[pid][0][TUMOR_TYPE_LABEL] == TUMOR_BENIGN:
+            benign.append(pid)
+        else:
+            malignant.append(pid)
+
+    return benign, malignant
         
 
 def convert_old_manifest_to_new_format(path_to_manifest, path_to_images):

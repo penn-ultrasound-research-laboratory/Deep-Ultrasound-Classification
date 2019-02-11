@@ -6,10 +6,10 @@ import uuid
 
 import numpy as np
 
-from src.pipeline.patientsample.patient_sample_generator import PatientSampleGenerator
-from src.constants.ultrasound import IMAGE_TYPE
+from pipeline.patientsample.patient_sample_generator import PatientSampleGenerator
+from constants.ultrasound import IMAGE_TYPE
 
-from keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
 
 dirname = os.path.dirname(__file__)
 

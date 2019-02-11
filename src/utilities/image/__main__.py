@@ -1,5 +1,5 @@
 import cv2
-from src.utilities.image.image import sample_to_batch
+from utilities.image.image import sample_to_batch
 
 batch_size = 5
 elephant = cv2.imread("../TestImages/frames/frame_0002.png", cv2.IMREAD_COLOR)

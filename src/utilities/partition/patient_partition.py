@@ -1,10 +1,9 @@
-import os
 import argparse
 
 from math import floor
 
-from src.constants.model import TRAIN_TEST_VALIDATION_SPLIT
-from src.constants.ultrasound import (
+from constants.model import TRAIN_TEST_VALIDATION_SPLIT
+from constants.ultrasound import (
     TUMOR_BENIGN,
     TUMOR_MALIGNANT)
 
@@ -53,8 +52,8 @@ def train_test_split_indices(
 
 
 def patient_train_test_split(
-        benign_path,
-        malignant_path,
+        benign_patients,
+        malignant_patients,
         train_split,
         random_seed=None):
     """Allocate patients to training, test, validation sets.
@@ -64,19 +63,16 @@ def patient_train_test_split(
     the ratios specified in a constants file.
 
     Arguments:
-        benign_path                absolute path to benign top level folder
-        malignant_path             absolute path to malignant top level folder
+        benign_patients                     list of benign patient ids
+        malignant_patients                  list of malignant patient ids
 
     Returns:
         Dictionary containing arrays: benign_train, benign_test, benign_cval,
             malignant_train, malignant_test, malignant_cval
     """
-
-    malignant_patients = [_ for _ in os.listdir(malignant_path) if os.path.isdir(os.path.join(malignant_path, _))]
-    benign_patients = [_ for _ in os.listdir(benign_path) if os.path.isdir(os.path.join(benign_path, _))]
-
-    num_malignant = len(malignant_patients)
+    
     num_benign = len(benign_patients)
+    num_malignant = len(malignant_patients)
 
     train_indices_mal, test_indices_mal = train_test_split_indices(
         train_split,

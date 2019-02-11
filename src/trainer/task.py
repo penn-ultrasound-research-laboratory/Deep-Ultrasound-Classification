@@ -2,6 +2,7 @@ import argparse
 import tensorflow as tf
 import json
 import yaml
+import os
 
 from dotmap import DotMap
 from datetime import datetime
@@ -11,12 +12,13 @@ from tensorflow.python.lib.io import file_io
 from tensorflow.python.framework.errors_impl import NotFoundError
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.optimizers import Adam
-from src.constants.ultrasound import string_to_image_type
-from src.pipeline.patientsample.patient_sample_generator import PatientSampleGenerator
-from src.utilities.partition.patient_partition import patient_train_test_split
-from src.utilities.general.general import default_none
+from constants.ultrasound import string_to_image_type
+from pipeline.patientsample.patient_sample_generator import PatientSampleGenerator
+from utilities.partition.patient_partition import patient_train_test_split
+from utilities.general.general import default_none
+from utilities.manifest.manifest import patient_type_lists
 
-DEFAULT_CONFIG = "src/config/default.yaml"
+DEFAULT_CONFIG = "../config/default.yaml"
 
 def train_model(args):
 
@@ -24,7 +26,8 @@ def train_model(args):
     MALIGNANT_TOP_LEVEL_PATH = args.images + "/Malignant"
 
     # Establish logging
-    logs_path = args.job_dir + '/logs/' + datetime.now().isoformat()
+    job_dir = default_none(args.job_dir, ".")
+    logs_path = "{0}/logs/{1}".format(job_dir, datetime.now().isoformat())
 
     # Load the configuration file yaml file if provided
     config_file = default_none(args.config, DEFAULT_CONFIG)
@@ -38,6 +41,7 @@ def train_model(args):
         print("Unable to load configuration file: {0}".format(config_file))
         return
 
+
     # Load the manifest file
     try:
         with file_io.FileIO(args.manifest, mode='r') as stream:
@@ -48,11 +52,17 @@ def train_model(args):
     except Exception as _:
         print("Unable to load manifest file: {0}".format(args.manifest))
         return
+    
+
+    benign_patients, malignant_patients = patient_type_lists(manifest)
+
+    print(benign_patients)
+    print(malignant_patients)
 
     # Train/test split according to config
     patient_split = DotMap(patient_train_test_split(
-        BENIGN_TOP_LEVEL_PATH,
-        MALIGNANT_TOP_LEVEL_PATH,
+        benign_patients,
+        malignant_patients,
         config.train_split,
         config.random_seed
     ))
@@ -86,7 +96,7 @@ def train_model(args):
         
 
     # Load the model specified in config
-    model = import_module("src.models.{0}".format(config.model)).get_model(config)
+    model = import_module("models.{0}".format(config.model)).get_model(config)
 
     model.summary()
 
@@ -115,6 +125,7 @@ def train_model(args):
     #         output_f.write(input_f.read())
 
     return
+
 
 if __name__ == "__main__":
 
@@ -149,11 +160,16 @@ if __name__ == "__main__":
         help="checkpoint (epoch id) that will be loaded. If a negative value is passed, default to zero"
     )
 
-    parser.add_argument("--num-workers", type=int, default=4, help="number of data loading workers")
-    
-    parser.add_argument("--disp-step", type=int, default=200, help="display step during training")
-    
-    parser.add_argument("--cuda", type=bool, default=True, help="enable CUDA")
+    parser.add_argument(
+        "-j",
+        "--job-dir",
+        help="the directory for logging in GC",
+        default=None
+    )
+
+    parser.add_argument('--num-workers', type=int, default=4, help='number of data loading workers')
+    parser.add_argument('--disp-step', type=int, default=200, help='display step during training')
+    parser.add_argument('--cuda', type=bool, default=True, help='enable CUDA')
     
     args=parser.parse_args()
     arguments= DotMap(args.__dict__)

@@ -7,17 +7,17 @@ import numpy as np
 import tensorflow as tf
 
 from tqdm import tqdm
-from src.utilities.partition.patient_partition import patient_train_test_validation_split
-from src.pipeline.patientsample.patient_sample_generator import PatientSampleGenerator
+from utilities.partition.patient_partition import patient_train_test_validation_split
+from pipeline.patientsample.patient_sample_generator import PatientSampleGenerator
 
-from src.constants.exceptions.customExceptions import ExtractSavePatientFeatureException
+from constants.exceptions.customExceptions import ExtractSavePatientFeatureException
 
-from src.constants.ultrasound import (
+from constants.ultrasound import (
     IMAGE_TYPE,
     NUMBER_CHANNELS_COLOR,
     NUMBER_CHANNELS_GRAYSCALE)
 
-from src.constants.model import (
+from constants.model import (
     DEFAULT_BATCH_SIZE,
     RESNET50_REQUIRED_NUMBER_CHANNELS,
     SAMPLE_WIDTH,
@@ -27,10 +27,10 @@ from src.constants.model import (
     RESNET_50_HEIGHT,
     RESNET_50_WIDTH)
     
-from keras.models import Model
-from keras.applications import inception_resnet_v2
-from keras.applications import resnet50
-from keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.models import Model
+from tensorflow.keras.applications import inception_resnet_v2
+from tensorflow.keras.applications import resnet50
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
 
 logger = logging.getLogger('research')
 

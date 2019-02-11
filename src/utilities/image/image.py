@@ -3,9 +3,7 @@ import cv2
 import logging
 import uuid
 import numpy as np
-from src.constants.ultrasound import IMAGE_TYPE
-from matplotlib import pyplot
-
+from constants.ultrasound import IMAGE_TYPE
 
 def extract_height_width(image_shape):
     return tuple(image_shape[:2])
@@ -209,6 +207,10 @@ def sample_to_batch(
     native_shape = extract_height_width(image.shape)
     native_min_dim = np.min(native_shape)
     target_shape = extract_height_width(target_shape) if (target_shape is not None) else None
+    
+    print("Native shape: {0}".format(native_shape))
+    print("Native min dim: {0}".format(native_min_dim))
+    print("target shape: {0}".format(target_shape))
 
     if target_shape is None:
         if not use_min_dimension:

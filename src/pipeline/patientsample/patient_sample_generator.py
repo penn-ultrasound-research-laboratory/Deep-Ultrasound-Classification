@@ -1,15 +1,14 @@
-import cv2
 import json
 import logging
 import os
 import uuid
 
 import numpy as np
-import matplotlib.pyplot as plt
+import tensorflow as tf
 
-import src.utilities.manifest.manifest as mu
+import utilities.manifest.manifest as mu
 
-from src.constants.ultrasound import (
+from constants.ultrasound import (
     image_type_to_opencv_color_mode,
     IMAGE_TYPE,
     IMAGE_TYPE_LABEL,
@@ -19,16 +18,16 @@ from src.constants.ultrasound import (
     FRAME_LABEL,
     SCALE_LABEL)
 
-from src.constants.model import (
+from constants.model import (
     DEFAULT_BATCH_SIZE,
     SAMPLE_WIDTH,
     SAMPLE_HEIGHT)
 
-from src.constants.ultrasound import tumor_integer_label
-from src.constants.exceptions.customExceptions import PatientSampleGeneratorException
-from src.utilities.image.image import sample_to_batch
+from constants.ultrasound import tumor_integer_label
+from constants.exceptions.customExceptions import PatientSampleGeneratorException
+from utilities.image.image import sample_to_batch
 
-from keras.utils import to_categorical
+from tensorflow.keras.utils import to_categorical
 
 LOGGER = logging.getLogger('research')
 
@@ -170,13 +169,12 @@ class PatientSampleGenerator:
             type_path = self.malignant_top_level_path 
 
         im_path = "{0}/{1}/{2}".format(type_path, self.patient_id, self.patient_frames[self.frame_index][FRAME_LABEL])
-        loaded_image = cv2.imread(im_path, color_mode)
-
-        # TODO: Verify that this makes sense with channel ordering. I thought OpenCV
-        # typically used GBR and not RGB
-
-        if current_frame_color == IMAGE_TYPE.GRAYSCALE.value:
-            loaded_image = cv2.cvtColor(loaded_image, cv2.COLOR_GRAY2RGB)
+        loaded_image = tf.io.read_file(im_path)
+        loaded_image = tf.image.decode_png(
+            loaded_image,
+            channels=3
+        )
+        print(loaded_image.shape)
 
         return loaded_image
 
