@@ -1,6 +1,14 @@
 from setuptools import setup
 from setuptools import find_packages
 
+REQUIRED_PACKAGES = [
+    "dotmap",
+    "opencv-python",
+    "numpy",
+    "tqdm>=4.24.0",
+    "scipy>=1.1.0"
+  ]
+
 setup(
   name="ultrasound-research",
   version="0.1",
@@ -11,11 +19,4 @@ setup(
   author_email="mattgoodman13@gmail.com",
   license="BSD3",
   include_package_data=True,
-  install_requires=[
-    "dotmap",
-    "opencv-python",
-    "numpy",
-    "tqdm>=4.24.0",
-    "scipy>=1.1.0"
-  ],
-  zip_safe=False)
+  install_requires=REQUIRED_PACKAGES)
