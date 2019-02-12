@@ -1,5 +1,4 @@
 import numpy as np
-import cv2
 from enum import Enum
 
 FOCUS_HASH_LABEL = 'FOCUS'
@@ -32,13 +31,6 @@ def string_to_image_type(str):
     else:
         raise ValueError("Not a valid image type")
 
-
-def image_type_to_opencv_color_mode(image_type):
-    """Converts image type (Grayscale/Color) to OpenCV image type"""
-    if image_type == IMAGE_TYPE.COLOR.value:
-        return cv2.IMREAD_COLOR
-    else:
-        return cv2.IMREAD_GRAYSCALE
 
 IMAGE_TYPE_LABEL = 'IMAGE_TYPE'
 INTERPOLATION_FACTOR_LABEL = 'INTERPOLATION_FACTOR'

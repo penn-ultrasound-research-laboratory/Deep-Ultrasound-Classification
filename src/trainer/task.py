@@ -56,9 +56,6 @@ def train_model(args):
 
     benign_patients, malignant_patients = patient_type_lists(manifest)
 
-    print(benign_patients)
-    print(malignant_patients)
-
     # Train/test split according to config
     patient_split = DotMap(patient_train_test_split(
         benign_patients,
@@ -98,7 +95,7 @@ def train_model(args):
     # Load the model specified in config
     model = import_module("models.{0}".format(config.model)).get_model(config)
 
-    model.summary()
+    # model.summary()
 
     model.compile(
         Adam(), # default Adam parameters for now
@@ -110,7 +107,7 @@ def train_model(args):
         steps_per_epoch=training_sample_generator.total_num_cleared_frames,
         epochs = 2, # Just for testing purposes
         verbose = 2,
-        use_multiprocessing = True,
+        use_multiprocessing = False,
         workers = args.num_workers
     )
 
@@ -167,7 +164,7 @@ if __name__ == "__main__":
         default=None
     )
 
-    parser.add_argument('--num-workers', type=int, default=4, help='number of data loading workers')
+    parser.add_argument('--num-workers', type=int, default=1, help='number of data loading workers')
     parser.add_argument('--disp-step', type=int, default=200, help='display step during training')
     parser.add_argument('--cuda', type=bool, default=True, help='enable CUDA')
     

@@ -3,7 +3,6 @@ from setuptools import find_packages
 
 REQUIRED_PACKAGES = [
     "dotmap",
-    "opencv-python",
     "numpy",
     "tqdm>=4.24.0",
     "scipy>=1.1.0"

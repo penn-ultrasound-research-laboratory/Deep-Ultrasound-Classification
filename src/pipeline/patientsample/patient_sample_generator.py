@@ -9,7 +9,6 @@ import tensorflow as tf
 import utilities.manifest.manifest as mu
 
 from constants.ultrasound import (
-    image_type_to_opencv_color_mode,
     IMAGE_TYPE,
     IMAGE_TYPE_LABEL,
     TUMOR_BENIGN,
@@ -161,8 +160,6 @@ class PatientSampleGenerator:
 
 
     def __load_current_frame_image(self, current_frame_color):
-        color_mode = image_type_to_opencv_color_mode(current_frame_color)
-
         if self.patient_frames[self.frame_index][TUMOR_TYPE_LABEL] is TUMOR_BENIGN:
             type_path = self.benign_top_level_path 
         else:
@@ -174,8 +171,7 @@ class PatientSampleGenerator:
             loaded_image,
             channels=3
         )
-        print(loaded_image.shape)
-
+        
         return loaded_image
 
 
@@ -191,49 +187,53 @@ class PatientSampleGenerator:
 
             if loaded_image is None or len(loaded_image.shape) < 2:
                 # Stored image is corrupted. Skip to next frame.
-                LOGGER.info("Skipping due to corruption: %s | frame: %s",
+                print("Skipping due to corruption: %s | frame: %s",
                             self.patient_id,
                             self.patient_frames[self.frame_index][FRAME_LABEL])
 
                 self.__transition_to_next_patient_frame_state(is_last_frame, is_last_patient)
                 continue
 
-            if self.sample_to_batch_config is None:
-                raw_image_batch = sample_to_batch(
-                    loaded_image,
-                    target_shape=self.target_shape,
-                    batch_size=self.batch_size,
-                    upscale_to_target=True,
-                    always_sample_center=False)
-            else:
-                raw_image_batch = sample_to_batch(
-                    loaded_image,
-                    target_shape=self.target_shape,
-                    batch_size=self.batch_size,
-                    **self.sample_to_batch_config)
+            # if self.sample_to_batch_config is None:
+            #     raw_image_batch = sample_to_batch(
+            #         loaded_image,
+            #         target_shape=self.target_shape,
+            #         batch_size=self.batch_size,
+            #         upscale_to_target=True,
+            #         always_sample_center=False)
+            # else:
+            #     raw_image_batch = sample_to_batch(
+            #         loaded_image,
+            #         target_shape=self.target_shape,
+            #         batch_size=self.batch_size,
+            #         **self.sample_to_batch_config)
+            raw_image_batch = tf.expand_dims(loaded_image, 0)
+            raw_image_batch = tf.tile(raw_image_batch, [self.batch_size, 1, 1, 1])
+            print(raw_image_batch)
+
 
             # print("Raw Image Batch shape: {0}".format(raw_image_batch.shape))
 
             # Convert the tumor string label to integer label
             frame_label = tumor_integer_label(self.patient_frames[self.frame_index][TUMOR_TYPE_LABEL])
 
-            # Optional image preprocessing
-            if self.image_data_generator is not None:
+            # # Optional image preprocessing
+            # if self.image_data_generator is not None:
 
-                # Input raw_image_batch is BGR in standard 0-255 range.
-                self.image_data_generator.fit(
-                    raw_image_batch,
-                    augment=True,
-                    rounds=10,
-                    seed=None)
+            #     # Input raw_image_batch is BGR in standard 0-255 range.
+            #     self.image_data_generator.fit(
+            #         raw_image_batch,
+            #         augment=True,
+            #         rounds=10,
+            #         seed=None)
 
-                gen = self.image_data_generator.flow(
-                    raw_image_batch,
-                    batch_size=self.batch_size,
-                    shuffle=True)
+            #     gen = self.image_data_generator.flow(
+            #         raw_image_batch,
+            #         batch_size=self.batch_size,
+            #         shuffle=True)
 
-                # Output of ImageDataGenerator assigned to raw_image_batch is now preprocessed
-                raw_image_batch = next(gen)
+            #     # Output of ImageDataGenerator assigned to raw_image_batch is now preprocessed
+            #     raw_image_batch = next(gen)
 
                 # LOGGER.debug("Used image data generator to transform input image to shape: {}".format(
                 #     raw_image_batch.shape))
