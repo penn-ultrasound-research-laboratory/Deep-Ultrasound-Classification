@@ -1,5 +1,5 @@
+
 import argparse
-import tensorflow as tf
 import json
 import yaml
 import os
@@ -10,13 +10,14 @@ from importlib import import_module
 
 from tensorflow.python.lib.io import file_io
 from tensorflow.python.framework.errors_impl import NotFoundError
-from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from keras_preprocessing.image import ImageDataGenerator
 from tensorflow.keras.optimizers import Adam
-from constants.ultrasound import string_to_image_type
+from constants.ultrasound import string_to_image_type, TUMOR_TYPES
 from pipeline.patientsample.patient_sample_generator import PatientSampleGenerator
 from utilities.partition.patient_partition import patient_train_test_split
 from utilities.general.general import default_none
-from utilities.manifest.manifest import patient_type_lists
+from utilities.manifest.manifest import patient_type_lists, patient_lists_to_dataframe
+
 
 DEFAULT_CONFIG = "../config/default.yaml"
 
@@ -66,18 +67,38 @@ def train_model(args):
 
     image_data_generator = ImageDataGenerator(**config.image_preprocessing.toDict())
 
-    training_sample_generator = PatientSampleGenerator(
+    train_df = patient_lists_to_dataframe(
         patient_split.train,
-        BENIGN_TOP_LEVEL_PATH,
-        BENIGN_TOP_LEVEL_PATH,
         manifest,
-        target_shape = config.input_shape,
+        string_to_image_type(config.image_type),
+        BENIGN_TOP_LEVEL_PATH,
+        MALIGNANT_TOP_LEVEL_PATH)
+
+    # training_sample_generator = PatientSampleGenerator(
+    #     patient_split.train,
+    #     BENIGN_TOP_LEVEL_PATH,
+    #     MALIGNANT_TOP_LEVEL_PATH,
+    #     manifest,
+    #     target_shape = config.target_shape,
+    #     batch_size = config.batch_size,
+    #     image_type = string_to_image_type(config.image_type),
+    #     image_data_generator = image_data_generator,
+    #     kill_on_last_patient = True,
+    #     use_categorical = True,
+    #     sample_to_batch_config = config.sample_to_batch_config.toDict())
+
+    train_generator = image_data_generator.flow_from_dataframe(
+        train_df,
+        x_col = "filename",
+        y_col = "class",
+        target_size = config.target_shape,
+        color_mode = "rgb",
+        class_mode = "binary",
+        classes = TUMOR_TYPES,
         batch_size = config.batch_size,
-        image_type = string_to_image_type(config.image_type),
-        image_data_generator = image_data_generator,
-        kill_on_last_patient = True,
-        use_categorical = True,
-        sample_to_batch_config = config.sample_to_batch_config.toDict())
+        shuffle = True,
+        seed = config.random_seed
+    )
 
     # test_sample_generator = PatientSampleGenerator(
     #     test_partition,
@@ -95,21 +116,25 @@ def train_model(args):
     # Load the model specified in config
     model = import_module("models.{0}".format(config.model)).get_model(config)
 
-    # model.summary()
+    model.summary()
 
     model.compile(
         Adam(), # default Adam parameters for now
         loss=config.loss,
         metrics=['accuracy'])
 
+    print(next(train_generator))
+
+
     model.fit_generator(
-        next(training_sample_generator),
-        steps_per_epoch=training_sample_generator.total_num_cleared_frames,
+        train_generator,
+        steps_per_epoch=len(train_df),
         epochs = 2, # Just for testing purposes
         verbose = 2,
         use_multiprocessing = False,
         workers = args.num_workers
     )
+
 
     # Evaluate the model
 

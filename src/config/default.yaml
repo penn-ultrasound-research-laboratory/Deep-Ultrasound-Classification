@@ -1,7 +1,7 @@
 identifier: default
 image_type: GRAYSCALE
 model: vgg16
-input_shape: [48, 48, 3]
+target_shape: [48, 48]
 pooling: max
 random_seed: 36
 train_split: 0.9  # training/validation ratio

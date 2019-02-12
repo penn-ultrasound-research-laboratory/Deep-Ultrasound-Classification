@@ -1,6 +1,8 @@
 import json
 import os
 
+import pandas as pd
+
 from constants.ultrasound import (
     FRAME_LABEL,
     IMAGE_TYPE,
@@ -60,6 +62,20 @@ def patient_type_lists(manifest):
             malignant.append(pid)
 
     return benign, malignant
+
+
+def patient_lists_to_dataframe(patients, manifest, image_type, benign_path, malignant_path):
+    records = []
+    for p in patients:
+        path = benign_path if p[1] is TUMOR_BENIGN else malignant_path
+        # Get all the frames that match the given image type
+        for f in get_valid_frame_samples(manifest[p[0]], image_type):
+            records.append({
+                "filename": "{0}/{1}/{2}".format(path, p[0], f[FRAME_LABEL]),
+                "class": p[1]
+            })
+    
+    return pd.DataFrame.from_records(records, columns=["filename", "class"])
         
 
 def convert_old_manifest_to_new_format(path_to_manifest, path_to_images):
