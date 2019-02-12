@@ -93,7 +93,7 @@ def train_model(args):
         y_col = "class",
         target_size = config.target_shape,
         color_mode = "rgb",
-        class_mode = "binary",
+        class_mode = "categorical",
         classes = TUMOR_TYPES,
         batch_size = config.batch_size,
         shuffle = True,
@@ -122,8 +122,6 @@ def train_model(args):
         Adam(), # default Adam parameters for now
         loss=config.loss,
         metrics=['accuracy'])
-
-    print(next(train_generator))
 
 
     model.fit_generator(
