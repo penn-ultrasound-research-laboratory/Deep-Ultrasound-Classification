@@ -8,9 +8,10 @@ from dotmap import DotMap
 from datetime import datetime
 from importlib import import_module
 
+
 from tensorflow.python.lib.io import file_io
 from tensorflow.python.framework.errors_impl import NotFoundError
-from keras_preprocessing.image import ImageDataGenerator
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.optimizers import Adam
 from constants.ultrasound import string_to_image_type, TUMOR_TYPES
 from pipeline.patientsample.patient_sample_generator import PatientSampleGenerator
@@ -18,13 +19,12 @@ from utilities.partition.patient_partition import patient_train_test_split
 from utilities.general.general import default_none
 from utilities.manifest.manifest import patient_type_lists, patient_lists_to_dataframe
 
+import tensorflow.keras.preprocessing
+print(tensorflow.keras.__version__)
 
 DEFAULT_CONFIG = "../config/default.yaml"
 
 def train_model(args):
-
-    BENIGN_TOP_LEVEL_PATH = args.images + "/Benign"
-    MALIGNANT_TOP_LEVEL_PATH = args.images + "/Malignant"
 
     # Establish logging
     job_dir = default_none(args.job_dir, ".")
@@ -65,30 +65,19 @@ def train_model(args):
         config.random_seed
     ))
 
-    image_data_generator = ImageDataGenerator(**config.image_preprocessing.toDict())
-
+    # Crawl the manifest to assemble dataframe of matching patient frames
     train_df = patient_lists_to_dataframe(
         patient_split.train,
         manifest,
         string_to_image_type(config.image_type),
-        BENIGN_TOP_LEVEL_PATH,
-        MALIGNANT_TOP_LEVEL_PATH)
+        "/Benign",
+        "/Malignant")
 
-    # training_sample_generator = PatientSampleGenerator(
-    #     patient_split.train,
-    #     BENIGN_TOP_LEVEL_PATH,
-    #     MALIGNANT_TOP_LEVEL_PATH,
-    #     manifest,
-    #     target_shape = config.target_shape,
-    #     batch_size = config.batch_size,
-    #     image_type = string_to_image_type(config.image_type),
-    #     image_data_generator = image_data_generator,
-    #     kill_on_last_patient = True,
-    #     use_categorical = True,
-    #     sample_to_batch_config = config.sample_to_batch_config.toDict())
+    image_data_generator = ImageDataGenerator(**config.image_preprocessing.toDict())
 
     train_generator = image_data_generator.flow_from_dataframe(
-        train_df,
+        dataframe = train_df,
+        directory = args.images,
         x_col = "filename",
         y_col = "class",
         target_size = config.target_shape,
@@ -99,19 +88,6 @@ def train_model(args):
         shuffle = True,
         seed = config.random_seed
     )
-
-    # test_sample_generator = PatientSampleGenerator(
-    #     test_partition,
-    #     benign_top_level_path,
-    #     malignant_top_level_path,
-    #     manifest,
-    #     target_shape = target_shape,
-    #     batch_size = config.batch_size,
-    #     image_type = image_type,
-    #     image_data_generator = image_data_generator,
-    #     kill_on_last_patient = True,
-    #     use_categorical = True)
-        
 
     # Load the model specified in config
     model = import_module("models.{0}".format(config.model)).get_model(config)

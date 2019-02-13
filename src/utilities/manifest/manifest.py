@@ -64,14 +64,14 @@ def patient_type_lists(manifest):
     return benign, malignant
 
 
-def patient_lists_to_dataframe(patients, manifest, image_type, benign_path, malignant_path):
+def patient_lists_to_dataframe(patients, manifest, image_type, benign_prefix, malignant_prefix):
     records = []
     for p in patients:
-        path = benign_path if p[1] is TUMOR_BENIGN else malignant_path
+        prefix = benign_prefix if p[1] is TUMOR_BENIGN else malignant_prefix
         # Get all the frames that match the given image type
         for f in get_valid_frame_samples(manifest[p[0]], image_type):
             records.append({
-                "filename": "{0}/{1}/{2}".format(path, p[0], f[FRAME_LABEL]),
+                "filename": "{0}/{1}/{2}".format(prefix, p[0], f[FRAME_LABEL]),
                 "class": p[1]
             })
     
