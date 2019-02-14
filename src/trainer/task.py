@@ -13,6 +13,7 @@ from tensorflow.python.lib.io import file_io
 from tensorflow.python.framework.errors_impl import NotFoundError
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.callbacks import TensorBoard
 from constants.ultrasound import string_to_image_type, TUMOR_TYPES
 from pipeline.patientsample.patient_sample_generator import PatientSampleGenerator
 from utilities.partition.patient_partition import patient_train_test_split
@@ -65,6 +66,15 @@ def train_model(args):
         config.random_seed
     ))
 
+    tb_callback = TensorBoard(
+        log_dir=job_dir,
+        histogram_freq=0,
+        batch_size=32,
+        write_graph=True,
+        write_grads=False,
+        write_images=False)
+
+
     # Crawl the manifest to assemble dataframe of matching patient frames
     train_df = patient_lists_to_dataframe(
         patient_split.train,
@@ -99,14 +109,14 @@ def train_model(args):
         loss=config.loss,
         metrics=['accuracy'])
 
-
     model.fit_generator(
         train_generator,
         steps_per_epoch=len(train_df),
         epochs = 2, # Just for testing purposes
         verbose = 2,
-        use_multiprocessing = False,
-        workers = args.num_workers
+        use_multiprocessing = True,
+        workers = args.num_workers,
+        callbacks = [tb_callback]
     )
 
 
