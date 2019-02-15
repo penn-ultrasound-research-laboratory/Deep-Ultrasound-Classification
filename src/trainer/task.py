@@ -11,7 +11,6 @@ from importlib import import_module
 
 from tensorflow.python.lib.io import file_io
 from tensorflow.python.framework.errors_impl import NotFoundError
-from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import TensorBoard
 from constants.ultrasound import string_to_image_type, TUMOR_TYPES
@@ -20,8 +19,7 @@ from utilities.partition.patient_partition import patient_train_test_split
 from utilities.general.general import default_none
 from utilities.manifest.manifest import patient_type_lists, patient_lists_to_dataframe
 
-import tensorflow.keras.preprocessing
-print(tensorflow.keras.__version__)
+from keras_preprocessing.image import ImageDataGenerator
 
 DEFAULT_CONFIG = "../config/default.yaml"
 
@@ -67,7 +65,7 @@ def train_model(args):
     ))
 
     tb_callback = TensorBoard(
-        log_dir=job_dir,
+        log_dir=logs_path,
         histogram_freq=0,
         batch_size=32,
         write_graph=True,
@@ -80,8 +78,8 @@ def train_model(args):
         patient_split.train,
         manifest,
         string_to_image_type(config.image_type),
-        "/Benign",
-        "/Malignant")
+        args.images + "/Benign",
+        args.images + "/Malignant")
 
     image_data_generator = ImageDataGenerator(**config.image_preprocessing.toDict())
 
@@ -102,7 +100,7 @@ def train_model(args):
     # Load the model specified in config
     model = import_module("models.{0}".format(config.model)).get_model(config)
 
-    model.summary()
+    # model.summary()
 
     model.compile(
         Adam(), # default Adam parameters for now
