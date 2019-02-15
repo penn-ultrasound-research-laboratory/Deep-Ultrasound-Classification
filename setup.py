@@ -5,7 +5,8 @@ REQUIRED_PACKAGES = [
     "dotmap",
     "numpy",
     "tqdm>=4.24.0",
-    "scipy>=1.1.0"
+    "scipy>=1.1.0",
+    "keras>=2.2.4"
   ]
 
 setup(

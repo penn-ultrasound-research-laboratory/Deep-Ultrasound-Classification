@@ -8,18 +8,18 @@ from dotmap import DotMap
 from datetime import datetime
 from importlib import import_module
 
-
 from tensorflow.python.lib.io import file_io
 from tensorflow.python.framework.errors_impl import NotFoundError
-from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.callbacks import TensorBoard
+
+from keras.optimizers import Adam
+from keras.callbacks import TensorBoard
+from keras.preprocessing.image import ImageDataGenerator
+
 from constants.ultrasound import string_to_image_type, TUMOR_TYPES
 from pipeline.patientsample.patient_sample_generator import PatientSampleGenerator
 from utilities.partition.patient_partition import patient_train_test_split
 from utilities.general.general import default_none
 from utilities.manifest.manifest import patient_type_lists, patient_lists_to_dataframe
-
-from keras_preprocessing.image import ImageDataGenerator
 
 DEFAULT_CONFIG = "../config/default.yaml"
 
@@ -81,11 +81,14 @@ def train_model(args):
         args.images + "/Benign",
         args.images + "/Malignant")
 
+    print(args.images)
+    print(train_df.iloc[0:2])
+
     image_data_generator = ImageDataGenerator(**config.image_preprocessing.toDict())
 
     train_generator = image_data_generator.flow_from_dataframe(
         dataframe = train_df,
-        directory = args.images,
+        directory = None,
         x_col = "filename",
         y_col = "class",
         target_size = config.target_shape,
@@ -103,7 +106,7 @@ def train_model(args):
     # model.summary()
 
     model.compile(
-        Adam(), # default Adam parameters for now
+        optimizer=Adam(), # default Adam parameters for now
         loss=config.loss,
         metrics=['accuracy'])
 

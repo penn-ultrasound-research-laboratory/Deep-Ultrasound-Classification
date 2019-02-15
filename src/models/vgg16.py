@@ -1,6 +1,6 @@
-from tensorflow.keras.applications.vgg16 import VGG16
-from tensorflow.keras.layers import Dense
-from tensorflow.keras.models import Model
+from keras.applications.vgg16 import VGG16
+from keras.layers import Dense
+from keras.models import Model
 
 
 def get_model(config):
