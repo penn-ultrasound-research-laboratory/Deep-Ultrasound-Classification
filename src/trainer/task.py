@@ -13,7 +13,7 @@ from tensorflow.python.framework.errors_impl import NotFoundError
 
 from keras.optimizers import Adam
 from keras.callbacks import TensorBoard
-from keras.preprocessing.image import ImageDataGenerator
+from keras_preprocessing.image import ImageDataGenerator
 
 from constants.ultrasound import string_to_image_type, TUMOR_TYPES
 from pipeline.patientsample.patient_sample_generator import PatientSampleGenerator
@@ -46,6 +46,7 @@ def train_model(args):
     try:
         with file_io.FileIO(args.manifest, mode='r') as stream:
             manifest = json.load(stream)
+            print(len(manifest))
     except NotFoundError as _:
         print("Manifest file not found: {0}".format(args.manifest))
         return
@@ -72,7 +73,6 @@ def train_model(args):
         write_grads=False,
         write_images=False)
 
-
     # Crawl the manifest to assemble dataframe of matching patient frames
     train_df = patient_lists_to_dataframe(
         patient_split.train,
@@ -82,12 +82,15 @@ def train_model(args):
         args.images + "/Malignant")
 
     print(args.images)
-    print(train_df.iloc[0:2])
+
+    for i in range(2):
+        print(train_df.iloc[i, 0])
+    
 
     image_data_generator = ImageDataGenerator(**config.image_preprocessing.toDict())
 
     train_generator = image_data_generator.flow_from_dataframe(
-        dataframe = train_df,
+        dataframe = train_df.iloc[0:2],
         directory = None,
         x_col = "filename",
         y_col = "class",
@@ -97,8 +100,11 @@ def train_model(args):
         classes = TUMOR_TYPES,
         batch_size = config.batch_size,
         shuffle = True,
-        seed = config.random_seed
+        seed = config.random_seed,
+        drop_duplicates = False
     )
+
+    print(train_generator.filenames)
 
     # Load the model specified in config
     model = import_module("models.{0}".format(config.model)).get_model(config)
@@ -112,7 +118,7 @@ def train_model(args):
 
     model.fit_generator(
         train_generator,
-        steps_per_epoch=len(train_df),
+        steps_per_epoch=len(train_df.iloc[0:2]),
         epochs = 2, # Just for testing purposes
         verbose = 2,
         use_multiprocessing = True,
