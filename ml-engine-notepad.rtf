@@ -1,0 +1,14 @@
+https://cloud.google.com/ml-engine/docs/tensorflow/training-jobs
+https://cloud.google.com/ml-engine/docs/tensorflow/packaging-trainer
+
+JOB_DIR = gs://research-storage/zero_to_one_train_20190204_201249
+
+gcloud ml-engine jobs submit training $JOB_NAME --scale-tier basic --module-name "src.trainer" --package-path ./ --job-dir $JOB_DIR --region "us-west1"
+
+Issues training locally? 
+tensorflow/core/platform/cloud/retrying_utils.cc:77] The operation failed and will be automatically retried in 0.710664 seconds (attempt 1 out of 10), caused by: Unavailable: Error executing an HTTP request: libcurl code 6 meaning 'Couldn't resolve host name', error details: Couldn't resolve host 'metadata'
+
+gcloud auth application-default login
+
+# LOCAL TESTING PROCEDURE
+python3 -m trainer.task --images ../../Dataset/V2.0_Processed --manifest ../../Dataset/V2.0_Processed/manifest.json --config config/default.yaml

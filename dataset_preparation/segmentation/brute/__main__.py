@@ -2,12 +2,12 @@ import argparse
 import cv2
 import os
 
-from src.constants.ultrasound import (
+from constants.ultrasound import (
     HSV_COLOR_THRESHOLD,
     FRAME_DEFAULT_ROW_CROP_FOR_SCAN_SELECTION,
     FRAME_DEFAULT_COL_CROP_FOR_SCAN_SELECTION)
 
-from src.utilities.segmentation.brute.grayscale import select_scan_window_from_frame
+from utilities.segmentation.brute.grayscale import select_scan_window_from_frame
 
 # TODO: [#48] Add argument to support grayscale vs. color
 # Only supports grayscale a.t.m

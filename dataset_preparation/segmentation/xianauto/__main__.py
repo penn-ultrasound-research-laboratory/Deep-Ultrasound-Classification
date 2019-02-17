@@ -1,7 +1,7 @@
 import cv2
 import os
 
-from src.utilities.segmentation.xianauto.automatic import get_ROI
+from utilities.segmentation.xianauto.automatic import get_ROI
 
 for i, f in enumerate(os.listdir("../TestImages/bank")):
     

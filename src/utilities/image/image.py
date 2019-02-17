@@ -1,10 +1,12 @@
 import argparse
-import cv2
 import logging
 import uuid
 import numpy as np
-from src.constants.ultrasound import IMAGE_TYPE
-from matplotlib import pyplot
+
+import tensorflow as tf
+
+from constants.ultrasound import IMAGE_TYPE
+from tensorflow.image import ResizeMethod
 
 
 def extract_height_width(image_shape):
@@ -26,17 +28,6 @@ def apply_multiple_crops(image, crop_descriptions):
     return np.stack(map(lambda crop: apply_single_crop(image, crop), crop_descriptions), axis=0)
 
 
-def apply_image_upscale(image, y_upscale_factor, x_upscale_factor, interpolation_method=cv2.INTER_CUBIC):
-    return cv2.resize(image, None, fx=x_upscale_factor, fy=y_upscale_factor, interpolation=interpolation_method)
-
-
-def uniform_upscale_to_target_shape(image, target_shape, safe_upscale_ratio=1.01):
-    native_shape = extract_height_width(image.shape)
-    target_shape = extract_height_width(target_shape)
-    upscale_ratio = max(np.divide(target_shape, native_shape)) * safe_upscale_ratio
-    return apply_image_upscale(image, upscale_ratio, upscale_ratio)
-
-
 def determine_image_type(bgr_image, color_percentage_threshold=0.04):
     """Determines image type (Grayscale/Color) of image
 
@@ -54,7 +45,11 @@ def determine_image_type(bgr_image, color_percentage_threshold=0.04):
         threshold of 0.015 was too low. Increased to 0.04. Hopefully shouldn't create false attribution.
         The color scale bar in true COLOR scans all but guarantees a percentage greater than 10%.
     """
-    b, g, r = cv2.split(bgr_image)
+    
+    b = bgr_image[0]
+    g = bgr_image[1]
+    r = bgr_image[2]
+
     equality_check = np.logical_and(np.logical_and(b == r, b == g), r == g)
 
     if 1.0 - (np.count_nonzero(equality_check) / equality_check.size) < color_percentage_threshold:
@@ -179,7 +174,7 @@ def sample_to_batch(
         target_shape=None,
         use_min_dimension=False,
         upscale_to_target=False,
-        interpolation_method=cv2.INTER_CUBIC,
+        interpolation_method=ResizeMethod.BICUBIC,
         always_sample_center=False):
     """Randomly sample an image to produce sample batch
 
@@ -197,7 +192,7 @@ def sample_to_batch(
         upscale_to_target                   Upscale the image so that image dimensions >= target_shape before sampling
                                                 target_shape must be defined to use upscale_to_target
                                                 
-        interpolation_method                Interpolation method to used. Default cv2.INTER_CUBIC
+        interpolation_method                Interpolation method to used. Default ResizeMethod.BICUBIC
 
     Returns:
         4D array containing sampled images in axis=0.
@@ -206,9 +201,13 @@ def sample_to_batch(
         ValueError: the target_shape is greater than the actual image shape in at least one dimension
     """
 
-    native_shape = extract_height_width(image.shape)
+    native_shape = extract_height_width(tf.shape(image))
     native_min_dim = np.min(native_shape)
     target_shape = extract_height_width(target_shape) if (target_shape is not None) else None
+    
+    print("Native shape: {0}".format(native_shape))
+    print("Native min dim: {0}".format(native_min_dim))
+    print("target shape: {0}".format(target_shape))
 
     if target_shape is None:
         if not use_min_dimension:
@@ -223,7 +222,12 @@ def sample_to_batch(
                 "If upscale_to_target is False, every dimension in native shape must be greater than target shape")
 
     if upscale_to_target:
-        image = uniform_upscale_to_target_shape(image, target_shape)
+        image = tf.image.resize_images(
+            image,
+            target_shape,
+            method=interpolation_method
+        )
+        print(image)
 
     if use_min_dimension:
         target_shape = np.array([native_min_dim, native_min_dim])

@@ -6,10 +6,9 @@ import uuid
 import math
 import numpy as np
 import scipy.stats as scp
-import matplotlib.pyplot as plt
 
-from src.constants.ultrasound import IMAGE_TYPE
-from src.constants.automatic import (
+from constants.ultrasound import IMAGE_TYPE
+from constants.automatic_segmentation import (
     FIND_SEED_POINT_STOPPING_CRITERION,
     FIND_SEED_POINT_MAXIMUM_ITERATIONS,
     FIND_SEED_POINT_NUMBER_DIRECTIONS,

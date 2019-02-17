@@ -46,3 +46,12 @@ PatientData/
             ├── focus_b9ad730b-2f1e-42d8-b532-deaf4d6ec696.png    # focus of frame_0001.png 
             └── focus_1ac74dff-f5ed-440b-a1fe-72e4d19d076f.png    # focus of frame_0002.png
 ```
+
+## Dependency Notes
+
+Notice that the source code (/src) includes its own copy of keras-preprocessing. This is a fork of keras-preprocessing v1.0.9 and includes two fixes: 
+
+- allows file loading from Google Cloud storage by wrapping pillow image load with TensorFlow:
+    - `pil_image.open(path, mode='rb')` (*before*)
+    - `pil_image.open(tensorflow.python.lib.io.ile_io.FileIO(path, mode='rb'))` (*after*)
+- Removes os file exist check from dataframe_iterator.py

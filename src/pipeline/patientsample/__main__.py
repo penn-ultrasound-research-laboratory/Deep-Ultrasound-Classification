@@ -1,4 +1,3 @@
-import cv2
 import json
 import logging
 import os
@@ -6,10 +5,10 @@ import uuid
 
 import numpy as np
 
-from src.pipeline.patientsample.patient_sample_generator import PatientSampleGenerator
-from src.constants.ultrasound import IMAGE_TYPE
+from pipeline.patientsample.patient_sample_generator import PatientSampleGenerator
+from constants.ultrasound import IMAGE_TYPE
 
-from keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
 
 dirname = os.path.dirname(__file__)
 
@@ -54,9 +53,6 @@ try:
         split = np.split(raw_image_batch, raw_image_batch.shape[0], axis=0)
         split = [np.squeeze(img, axis=0) for img in split]
 
-        # cv2.imshow("sample", np.hstack(split))
-        # cv2.waitKey(0)
-
         plot_rows.append(np.hstack(split))
 
         count += 1
@@ -65,8 +61,3 @@ except Exception as e:
     print(e)
 
 sample_thumbnails = np.vstack(plot_rows)
-
-# cv2.imshow("sample", sample_thumbnails)
-# cv2.waitKey(0)
-
-cv2.imwrite('thumbnails_{}.png'.format(uuid.uuid4()), sample_thumbnails)

@@ -1,8 +1,8 @@
 import argparse
 import traceback
 
-from src.constants.exceptions.customExceptions import TrainEvaluateLinearClassifierException
-from src.pipeline.linearclassifier.train_evaluate_linear_classifier import train_evaluate_linear_classifier
+from constants.exceptions.customExceptions import TrainEvaluateLinearClassifierException
+from pipeline.linearclassifier.train_evaluate_linear_classifier import train_evaluate_linear_classifier
 
 parser = argparse.ArgumentParser()
 

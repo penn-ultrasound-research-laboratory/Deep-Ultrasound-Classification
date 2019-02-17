@@ -1,6 +1,6 @@
 import argparse
 
-from src.utilities.partition.patient_partition import patient_train_test_validation_split
+from utilities.partition.patient_partition import patient_train_test_validation_split
 
 PARSER = argparse.ArgumentParser()
 

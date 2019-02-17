@@ -1,6 +1,0 @@
-https://cloud.google.com/ml-engine/docs/tensorflow/training-jobs
-https://cloud.google.com/ml-engine/docs/tensorflow/packaging-trainer
-
-JOB_DIR = gs://research-storage/zero_to_one_train_20190204_201249
-
-gcloud ml-engine jobs submit training $JOB_NAME --scale-tier basic --module-name "src.trainer" --package-path ./ --job-dir $JOB_DIR --region "us-west1"

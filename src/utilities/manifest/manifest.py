@@ -1,7 +1,9 @@
 import json
 import os
 
-from src.constants.ultrasound import (
+import pandas as pd
+
+from constants.ultrasound import (
     FRAME_LABEL,
     IMAGE_TYPE,
     IMAGE_TYPE_LABEL,
@@ -48,6 +50,32 @@ def merge_manifest(path_to_manifest_a, path_to_manifest_b, output_path):
 
     with open(output_path, 'w') as f:
         json.dump(composite_manifest, f)
+
+
+def patient_type_lists(manifest):
+    benign = []
+    malignant = []
+    for pid in manifest.keys():
+        if manifest[pid][0][TUMOR_TYPE_LABEL] == TUMOR_BENIGN:
+            benign.append(pid)
+        else:
+            malignant.append(pid)
+
+    return benign, malignant
+
+
+def patient_lists_to_dataframe(patients, manifest, image_type, benign_prefix, malignant_prefix):
+    records = []
+    for p in patients:
+        prefix = benign_prefix if p[1] is TUMOR_BENIGN else malignant_prefix
+        # Get all the frames that match the given image type
+        for f in get_valid_frame_samples(manifest[p[0]], image_type):
+            records.append({
+                "filename": "{0}/{1}/{2}".format(prefix, p[0], f[FRAME_LABEL]),
+                "class": p[1]
+            })
+    
+    return pd.DataFrame.from_records(records, columns=["filename", "class"])
         
 
 def convert_old_manifest_to_new_format(path_to_manifest, path_to_images):
