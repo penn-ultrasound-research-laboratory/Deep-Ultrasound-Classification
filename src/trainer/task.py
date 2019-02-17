@@ -83,14 +83,10 @@ def train_model(args):
 
     print(args.images)
 
-    for i in range(2):
-        print(train_df.iloc[i, 0])
-    
-
     image_data_generator = ImageDataGenerator(**config.image_preprocessing.toDict())
 
     train_generator = image_data_generator.flow_from_dataframe(
-        dataframe = train_df.iloc[0:2],
+        dataframe = train_df,
         directory = None,
         x_col = "filename",
         y_col = "class",
@@ -118,7 +114,7 @@ def train_model(args):
 
     model.fit_generator(
         train_generator,
-        steps_per_epoch=len(train_df.iloc[0:2]),
+        steps_per_epoch=len(train_df),
         epochs = 2, # Just for testing purposes
         verbose = 2,
         use_multiprocessing = True,
