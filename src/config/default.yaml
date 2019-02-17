@@ -4,7 +4,8 @@ model: vgg16
 target_shape: [48, 48]
 pooling: max
 random_seed: 36
-train_split: 0.9  # training/validation ratio
+train_split: 0.8  # training/validation ratio
+validation_split: 0.1
 batch_size: 8
 optimizer: rmsp
 learning_rate: 1.0e-4

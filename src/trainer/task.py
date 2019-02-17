@@ -32,6 +32,7 @@ def train_model(args):
     # Load the configuration file yaml file if provided
     config_file = default_none(args.config, DEFAULT_CONFIG)
     try:
+        print("Loading configuration file from: {0}".format(config_file))
         with file_io.FileIO(config_file, mode='r') as stream:
             config = DotMap(yaml.load(stream))
     except NotFoundError as _:
@@ -41,12 +42,11 @@ def train_model(args):
         print("Unable to load configuration file: {0}".format(config_file))
         return
 
-
     # Load the manifest file
     try:
+        print("Loading manifest file from: {0}".format(args.manifest))
         with file_io.FileIO(args.manifest, mode='r') as stream:
             manifest = json.load(stream)
-            print(len(manifest))
     except NotFoundError as _:
         print("Manifest file not found: {0}".format(args.manifest))
         return
@@ -54,7 +54,7 @@ def train_model(args):
         print("Unable to load manifest file: {0}".format(args.manifest))
         return
     
-
+    
     benign_patients, malignant_patients = patient_type_lists(manifest)
 
     # Train/test split according to config
@@ -62,8 +62,13 @@ def train_model(args):
         benign_patients,
         malignant_patients,
         config.train_split,
-        config.random_seed
+        validation_split = config.validation_split,
+        random_seed = config.random_seed
     ))
+
+    print(patient_split.train)
+    print(patient_split.validation)
+    return
 
     tb_callback = TensorBoard(
         log_dir=logs_path,

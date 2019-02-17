@@ -19,7 +19,6 @@ IMAGES_PATH="gs://$STORAGE/$DATASET"
 MANIFEST_PATH="gs://$STORAGE/$MANIFEST"
 
 # Path to config
-# will convert to arg at some point
 CONFIG_FILE="default.yaml" 
 MODEL_CONFIG_PATH="src/config/$CONFIG_FILE"
 
@@ -27,7 +26,6 @@ MODEL_CONFIG_PATH="src/config/$CONFIG_FILE"
 NUM_WORKERS=2
 
 # Production run
-
 gcloud ml-engine local train --package-path $TRAINER_PACKAGE_PATH \
         --module-name $MAIN_TRAINER_MODULE \
         -- \
