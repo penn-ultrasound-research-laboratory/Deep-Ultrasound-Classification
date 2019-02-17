@@ -255,7 +255,10 @@ class DataFrameIterator(BatchFromFilesMixin, Iterator):
             lambda fname: os.path.join(self.directory or '', fname)
         )
         format_check = filepaths.map(get_extension).isin(self.white_list_formats)
-        print("HEREEREREERe")
+
+        ## Local fork supporting Google Cloud Storage flow from dataframe training
+        ## os.path.isfile will fail on a Google Cloud instance because the files are not actuall on the instance
+        
         # existence_check = filepaths.map(os.path.isfile)
         return df[format_check]
 
