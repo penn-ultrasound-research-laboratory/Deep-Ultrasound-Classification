@@ -69,7 +69,7 @@ def train_model(args):
     tb_callback = TensorBoard(
         log_dir=logs_path,
         histogram_freq=0,
-        batch_size=32,
+        batch_size=config.batch_size,
         write_graph=True,
         write_grads=False,
         write_images=False)
@@ -84,10 +84,15 @@ def train_model(args):
         
     # Shuffle the training DataFrame
     train_df = train_df.sample(frac=1).reset_index(drop=True)
+    
+    # Print some sample information
+    print("Training DataFrame shape: {0}".format(train_df.shape))
+    print(train_df.iloc[0:5])
 
-    image_data_generator = ImageDataGenerator(**config.image_preprocessing.toDict())
+    train_data_generator = ImageDataGenerator(**config.image_preprocessing.toDict())
+    test_data_generator = ImageDataGenerator(rescale=1./255)
 
-    train_generator = image_data_generator.flow_from_dataframe(
+    train_generator = train_data_generator.flow_from_dataframe(
         dataframe = train_df,
         directory = None,
         x_col = "filename",
@@ -113,7 +118,7 @@ def train_model(args):
 
         validation_df = validation_df.sample(frac=1).reset_index(drop=True)
 
-        validation_generator = image_data_generator.flow_from_dataframe(
+        validation_generator = test_data_generator.flow_from_dataframe(
             dataframe = validation_df,
             directory = None,
             x_col = "filename",
@@ -128,13 +133,13 @@ def train_model(args):
             drop_duplicates = False
         )
     else:
+        # Config does not specify validation split
         validation_generator = None
 
     # Load the model specified in config
     model = import_module("models.{0}".format(config.model)).get_model(config)
 
     # model.summary()
-
     model.compile(
         optimizer=Adam(), # default Adam parameters for now
         loss=config.loss,
@@ -142,9 +147,10 @@ def train_model(args):
 
     model.fit_generator(
         train_generator,
-        steps_per_epoch=len(train_df),
+        steps_per_epoch=len(train_df) // config.batch_size,
         epochs = 2, # Just for testing purposes
         validation_data = validation_generator,
+        validation_steps=len(validation_df) // config.batch_size,
         verbose = 2,
         use_multiprocessing = True,
         workers = args.num_workers,

@@ -13,6 +13,7 @@ decay_rate: 0.97
 test_interval: 1
 loss: binary_crossentropy
 image_preprocessing:
+  rescale: 0.003921568627 # rescale all inputs by 1/255
   horizontal_flip: True
   vertical_flip: True
 sample_to_batch_config:
