@@ -66,10 +66,6 @@ def train_model(args):
         random_seed = config.random_seed
     ))
 
-    print(patient_split.train)
-    print(patient_split.validation)
-    return
-
     tb_callback = TensorBoard(
         log_dir=logs_path,
         histogram_freq=0,

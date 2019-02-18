@@ -1,45 +1,28 @@
 import argparse
 
-from math import floor
-
-from tensorflow.random import shuffle
-
 from constants.model import TRAIN_TEST_VALIDATION_SPLIT
 from constants.ultrasound import (
     TUMOR_BENIGN,
     TUMOR_MALIGNANT)
 
-import tensorflow as tf
 import numpy as np
 
 
 def train_test_validation_indices(train_split, validation_split, N, random_seed=None):
 
-    splits = np.floor(np.array([train_split * N, validation_split * N]))
-    print(splits)
-    splits = np.append(splits, N - np.sum(splits)).astype(np.uint32)
+    splits = np.floor(np.array([train_split * N, validation_split * N])).astype(np.uint8)
+    indices =  np.arange(N)
+    np.random.shuffle(indices)
 
-    print(splits)
-    train, validation, test = tf.split(
-        shuffle(list(range(N)), seed=random_seed),
-        splits
-    )
-
-    return (train, validation, test)
-
+    return np.split(indices, np.cumsum(splits))
 
 def train_test_split_indices(train_split, N, random_seed=None):
 
-    splits = np.floor([train_split * N])
-    np.append(splits, N - int(np.sum(splits)))
+    splits = np.floor([train_split * N]).astype(np.uint8)
+    indices =  np.arange(N)
+    np.random.shuffle(indices)
 
-    print(splits)
-    train, test = tf.split(
-        shuffle(list(range(N)), seed=random_seed),
-        splits
-    )
-
-    return (train, test)
+    return np.split(indices, np.cumsum(splits))
 
 
 def patient_train_test_split(
@@ -62,6 +45,9 @@ def patient_train_test_split(
         Dictionary containing arrays: benign_train, benign_test, benign_cval,
             malignant_train, malignant_test, malignant_cval
     """
+
+    if random_seed:
+        np.random.seed(random_seed)
 
     num_benign = len(benign_patients)
     num_malignant = len(malignant_patients)
