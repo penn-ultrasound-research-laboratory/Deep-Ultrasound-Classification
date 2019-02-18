@@ -74,15 +74,16 @@ def train_model(args):
         write_grads=False,
         write_images=False)
 
-    # Crawl the manifest to assemble dataframe of matching patient frames
+    # Crawl the manifest to assemble training DataFrame of matching patient frames
     train_df = patient_lists_to_dataframe(
         patient_split.train,
         manifest,
         string_to_image_type(config.image_type),
         args.images + "/Benign",
         args.images + "/Malignant")
-
-    print(args.images)
+        
+    # Shuffle the training DataFrame
+    train_df = train_df.sample(frac=1).reset_index(drop=True)
 
     image_data_generator = ImageDataGenerator(**config.image_preprocessing.toDict())
 
@@ -101,7 +102,33 @@ def train_model(args):
         drop_duplicates = False
     )
 
-    print(train_generator.filenames)
+    # Assemble validation DataFrame if specified in config 
+    if config.validation_split:
+        validation_df = patient_lists_to_dataframe(
+            patient_split.validation,
+            manifest,
+            string_to_image_type(config.image_type),
+            args.images + "/Benign",
+            args.images + "/Malignant")
+
+        validation_df = validation_df.sample(frac=1).reset_index(drop=True)
+
+        validation_generator = image_data_generator.flow_from_dataframe(
+            dataframe = validation_df,
+            directory = None,
+            x_col = "filename",
+            y_col = "class",
+            target_size = config.target_shape,
+            color_mode = "rgb",
+            class_mode = "categorical",
+            classes = TUMOR_TYPES,
+            batch_size = config.batch_size,
+            shuffle = True,
+            seed = config.random_seed,
+            drop_duplicates = False
+        )
+    else:
+        validation_generator = None
 
     # Load the model specified in config
     model = import_module("models.{0}".format(config.model)).get_model(config)
@@ -117,6 +144,7 @@ def train_model(args):
         train_generator,
         steps_per_epoch=len(train_df),
         epochs = 2, # Just for testing purposes
+        validation_data = validation_generator,
         verbose = 2,
         use_multiprocessing = True,
         workers = args.num_workers,
