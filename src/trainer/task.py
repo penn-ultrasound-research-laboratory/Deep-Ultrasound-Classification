@@ -32,6 +32,7 @@ def train_model(args):
     # Load the configuration file yaml file if provided
     config_file = default_none(args.config, DEFAULT_CONFIG)
     try:
+        print("Loading configuration file from: {0}".format(config_file))
         with file_io.FileIO(config_file, mode='r') as stream:
             config = DotMap(yaml.load(stream))
     except NotFoundError as _:
@@ -41,12 +42,11 @@ def train_model(args):
         print("Unable to load configuration file: {0}".format(config_file))
         return
 
-
     # Load the manifest file
     try:
+        print("Loading manifest file from: {0}".format(args.manifest))
         with file_io.FileIO(args.manifest, mode='r') as stream:
             manifest = json.load(stream)
-            print(len(manifest))
     except NotFoundError as _:
         print("Manifest file not found: {0}".format(args.manifest))
         return
@@ -54,7 +54,7 @@ def train_model(args):
         print("Unable to load manifest file: {0}".format(args.manifest))
         return
     
-
+    
     benign_patients, malignant_patients = patient_type_lists(manifest)
 
     # Train/test split according to config
@@ -62,30 +62,37 @@ def train_model(args):
         benign_patients,
         malignant_patients,
         config.train_split,
-        config.random_seed
+        validation_split = config.validation_split,
+        random_seed = config.random_seed
     ))
 
     tb_callback = TensorBoard(
         log_dir=logs_path,
         histogram_freq=0,
-        batch_size=32,
+        batch_size=config.batch_size,
         write_graph=True,
         write_grads=False,
         write_images=False)
 
-    # Crawl the manifest to assemble dataframe of matching patient frames
+    # Crawl the manifest to assemble training DataFrame of matching patient frames
     train_df = patient_lists_to_dataframe(
         patient_split.train,
         manifest,
         string_to_image_type(config.image_type),
         args.images + "/Benign",
         args.images + "/Malignant")
+        
+    # Shuffle the training DataFrame
+    train_df = train_df.sample(frac=1).reset_index(drop=True)
+    
+    # Print some sample information
+    print("Training DataFrame shape: {0}".format(train_df.shape))
+    print(train_df.iloc[0:5])
 
-    print(args.images)
+    train_data_generator = ImageDataGenerator(**config.image_preprocessing.toDict())
+    test_data_generator = ImageDataGenerator(rescale=1./255)
 
-    image_data_generator = ImageDataGenerator(**config.image_preprocessing.toDict())
-
-    train_generator = image_data_generator.flow_from_dataframe(
+    train_generator = train_data_generator.flow_from_dataframe(
         dataframe = train_df,
         directory = None,
         x_col = "filename",
@@ -100,13 +107,39 @@ def train_model(args):
         drop_duplicates = False
     )
 
-    print(train_generator.filenames)
+    # Assemble validation DataFrame if specified in config 
+    if config.validation_split:
+        validation_df = patient_lists_to_dataframe(
+            patient_split.validation,
+            manifest,
+            string_to_image_type(config.image_type),
+            args.images + "/Benign",
+            args.images + "/Malignant")
+
+        validation_df = validation_df.sample(frac=1).reset_index(drop=True)
+
+        validation_generator = test_data_generator.flow_from_dataframe(
+            dataframe = validation_df,
+            directory = None,
+            x_col = "filename",
+            y_col = "class",
+            target_size = config.target_shape,
+            color_mode = "rgb",
+            class_mode = "categorical",
+            classes = TUMOR_TYPES,
+            batch_size = config.batch_size,
+            shuffle = True,
+            seed = config.random_seed,
+            drop_duplicates = False
+        )
+    else:
+        # Config does not specify validation split
+        validation_generator = None
 
     # Load the model specified in config
     model = import_module("models.{0}".format(config.model)).get_model(config)
 
     # model.summary()
-
     model.compile(
         optimizer=Adam(), # default Adam parameters for now
         loss=config.loss,
@@ -114,8 +147,10 @@ def train_model(args):
 
     model.fit_generator(
         train_generator,
-        steps_per_epoch=len(train_df),
+        steps_per_epoch=len(train_df) // config.batch_size,
         epochs = 2, # Just for testing purposes
+        validation_data = validation_generator,
+        validation_steps=len(validation_df) // config.batch_size,
         verbose = 2,
         use_multiprocessing = True,
         workers = args.num_workers,

@@ -1,7 +1,5 @@
 import argparse
 
-from math import floor
-
 from constants.model import TRAIN_TEST_VALIDATION_SPLIT
 from constants.ultrasound import (
     TUMOR_BENIGN,
@@ -10,51 +8,28 @@ from constants.ultrasound import (
 import numpy as np
 
 
-def train_test_split_indices(
-    train_split, 
-    number_samples,
-    random_seed=None):
-    """Return train/test/validate indices for a given number of samples
+def train_test_validation_indices(train_split, validation_split, N, random_seed=None):
 
-    Given percentages to use for train/test/(validate) split, return indices that can be used to index
-    into identifier arrays at a higher level.
+    splits = np.floor(np.array([train_split * N, validation_split * N])).astype(np.uint8)
+    indices =  np.arange(N)
+    np.random.shuffle(indices)
 
-    Note: The sum of train and test does not need to equal 1.0. Any remaining percentage will be used for
-    validation indices
+    return np.split(indices, np.cumsum(splits))
 
-    Arguments:
-        train_split                         The percentage to use for the train split (0 < x < 1.0)
-        number_samples                      Integer number of samples to split
+def train_test_split_indices(train_split, N, random_seed=None):
 
-    Returns:
-        Length 3 tuple where each value is a list of indices:
-        (
-            train_indices,
-            test_indices,
-            validation_indices
-        )
-    """
+    splits = np.floor([train_split * N]).astype(np.uint8)
+    indices =  np.arange(N)
+    np.random.shuffle(indices)
 
-    # Optionally set random seed
-    if random_seed is not None:
-         np.random.seed(random_seed)
-
-    # Training indices
-    train_indices = np.random.choice(
-        number_samples,
-        floor(train_split * number_samples),
-        replace=False).tolist()
-
-    # Test indices
-    test_indices = [index for index in np.arange(number_samples) if index not in train_indices]
-
-    return (train_indices, test_indices)
+    return np.split(indices, np.cumsum(splits))
 
 
 def patient_train_test_split(
         benign_patients,
         malignant_patients,
         train_split,
+        validation_split = None,
         random_seed=None):
     """Allocate patients to training, test, validation sets.
 
@@ -70,31 +45,59 @@ def patient_train_test_split(
         Dictionary containing arrays: benign_train, benign_test, benign_cval,
             malignant_train, malignant_test, malignant_cval
     """
-    
+
+    if random_seed:
+        np.random.seed(random_seed)
+
     num_benign = len(benign_patients)
     num_malignant = len(malignant_patients)
 
-    train_indices_mal, test_indices_mal = train_test_split_indices(
-        train_split,
-        num_malignant,
-        random_seed=random_seed)
+    if validation_split:
+        train_ben, val_ben, test_ben = train_test_validation_indices(
+            train_split,
+            validation_split,
+            num_benign,
+            random_seed=random_seed)
+        
+        train_mal, val_mal, test_mal = train_test_validation_indices(
+            train_split,
+            validation_split,
+            num_malignant,
+            random_seed=random_seed)
 
-    train_indices_ben, test_indices_ben = train_test_split_indices(
-        train_split,
-        num_benign,
-        random_seed=random_seed)
+    else:
+        train_ben, test_ben = train_test_split_indices(
+            train_split,
+            num_benign,
+            random_seed=random_seed)
+        
+        train_mal, test_mal = train_test_split_indices(
+            train_split,
+            num_malignant,
+            random_seed=random_seed)
 
     # Partition always contains train/test
-    patient_split = {
-        "benign_train": [(benign_patients[_], TUMOR_BENIGN) for _ in train_indices_ben],
-        "benign_test": [(benign_patients[_], TUMOR_BENIGN) for _ in test_indices_ben],
-        "malignant_train": [(malignant_patients[_], TUMOR_MALIGNANT) for _ in train_indices_mal],
-        "malignant_test": [(malignant_patients[_], TUMOR_MALIGNANT) for _ in test_indices_mal]
+    ps = {
+        "benign_train": [(benign_patients[_], TUMOR_BENIGN) for _ in train_ben],
+        "benign_test": [(benign_patients[_], TUMOR_BENIGN) for _ in test_ben],
+        "malignant_train": [(malignant_patients[_], TUMOR_MALIGNANT) for _ in train_mal],
+        "malignant_test": [(malignant_patients[_], TUMOR_MALIGNANT) for _ in test_mal]
     }
 
-    patient_split.update({
-        "train": patient_split["benign_train"] + patient_split["malignant_train"],
-        "test": patient_split["benign_test"] + patient_split["malignant_test"]
+    if validation_split:
+        ps.update({
+            "benign_validation": [(benign_patients[_], TUMOR_BENIGN) for _ in val_ben],
+            "malignant_validation": [(malignant_patients[_], TUMOR_MALIGNANT) for _ in val_mal],
+        })
+
+    ps.update({
+        "train": ps["benign_train"] + ps["malignant_train"],
+        "test": ps["benign_test"] + ps["malignant_test"]
     })
 
-    return patient_split
+    if validation_split:
+        ps.update({
+            "validation": ps["benign_validation"] + ps["malignant_validation"]
+        })
+
+    return ps
