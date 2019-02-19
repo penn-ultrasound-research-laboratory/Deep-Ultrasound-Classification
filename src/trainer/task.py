@@ -97,7 +97,8 @@ def train_model(args):
         
         # Print some sample information
         print("Training DataFrame shape: {0}".format(train_df.shape))
-        print(train_df.iloc[0:5])
+        print ("Training DataFrame sample rows:")
+        print(train_df.iloc[:2])
 
         train_data_generator = ImageDataGenerator(**config.image_preprocessing.toDict())
         test_data_generator = ImageDataGenerator(rescale=1./255)
@@ -159,10 +160,10 @@ def train_model(args):
         model.fit_generator(
             train_generator,
             steps_per_epoch=len(train_df) // config.batch_size,
-            epochs = 10, # Just for testing purposes
+            epochs = config.training_epochs,
             validation_data = validation_generator,
             validation_steps=len(validation_df) // config.batch_size,
-            verbose = 2,
+            verbose = 1,
             use_multiprocessing = True,
             workers = args.num_workers,
             callbacks = [tb_callback]
