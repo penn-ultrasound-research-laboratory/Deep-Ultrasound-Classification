@@ -12,7 +12,7 @@ REQUIRED_PACKAGES = [
 
 setup(
   name="ultrasound-research",
-  version="0.1",
+  version="1.0",
   package_dir={"":"src"},
   packages=find_packages("src"),
   description="Ultrasound research repository",

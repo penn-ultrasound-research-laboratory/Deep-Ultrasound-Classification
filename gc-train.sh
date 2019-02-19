@@ -1,4 +1,4 @@
-TRAINER_PACKAGE_PATH="/Users/Matthew/Documents/Research/ultrasound-ml-engine/src"
+TRAINER_PACKAGE_PATH="/Users/Matthew/Documents/Research/UltrasoundResearch/src"
 MAIN_TRAINER_MODULE="trainer.task"
 STORAGE_BUCKET="research-storage"
 
@@ -7,7 +7,7 @@ MANIFEST="manifest.json"
 CONFIG_FILE="default.yaml" # will convert to arg at some point
 
 REGION="us-west1"
-SCALE_TIER="basic"
+SCALE_TIER="BASIC_GPU"
 
 now=$(date +"%Y%m%d_%H%M%S")
 JOB_NAME="grayscale_train_$now"

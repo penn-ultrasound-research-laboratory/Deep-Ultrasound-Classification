@@ -8,6 +8,9 @@ from dotmap import DotMap
 from datetime import datetime
 from importlib import import_module
 
+import tensorflow as tf
+import numpy as np
+
 from tensorflow.python.lib.io import file_io
 from tensorflow.python.framework.errors_impl import NotFoundError
 
@@ -25,148 +28,156 @@ DEFAULT_CONFIG = "../config/default.yaml"
 
 def train_model(args):
 
-    # Establish logging
-    job_dir = default_none(args.job_dir, ".")
-    logs_path = "{0}/logs/{1}".format(job_dir, datetime.now().isoformat())
+    with tf.device('/device:GPU:0'):
 
-    # Load the configuration file yaml file if provided
-    config_file = default_none(args.config, DEFAULT_CONFIG)
-    try:
-        print("Loading configuration file from: {0}".format(config_file))
-        with file_io.FileIO(config_file, mode='r') as stream:
-            config = DotMap(yaml.load(stream))
-    except NotFoundError as _:
-        print("Configuration file not found: {0}".format(config_file))
-        return
-    except Exception as _:
-        print("Unable to load configuration file: {0}".format(config_file))
-        return
+        # Establish logging
+        job_dir = default_none(args.job_dir, ".")
+        logs_path = "{0}/logs/{1}".format(job_dir, datetime.now().isoformat())
 
-    # Load the manifest file
-    try:
-        print("Loading manifest file from: {0}".format(args.manifest))
-        with file_io.FileIO(args.manifest, mode='r') as stream:
-            manifest = json.load(stream)
-    except NotFoundError as _:
-        print("Manifest file not found: {0}".format(args.manifest))
-        return
-    except Exception as _:
-        print("Unable to load manifest file: {0}".format(args.manifest))
-        return
-    
-    
-    benign_patients, malignant_patients = patient_type_lists(manifest)
+        # Load the configuration file yaml file if provided
+        config_file = default_none(args.config, DEFAULT_CONFIG)
+        try:
+            print("Loading configuration file from: {0}".format(config_file))
+            with file_io.FileIO(config_file, mode='r') as stream:
+                config = DotMap(yaml.load(stream))
+        except NotFoundError as _:
+            print("Configuration file not found: {0}".format(config_file))
+            return
+        except Exception as _:
+            print("Unable to load configuration file: {0}".format(config_file))
+            return
 
-    # Train/test split according to config
-    patient_split = DotMap(patient_train_test_split(
-        benign_patients,
-        malignant_patients,
-        config.train_split,
-        validation_split = config.validation_split,
-        random_seed = config.random_seed
-    ))
-
-    tb_callback = TensorBoard(
-        log_dir=logs_path,
-        histogram_freq=0,
-        batch_size=config.batch_size,
-        write_graph=True,
-        write_grads=False,
-        write_images=False)
-
-    # Crawl the manifest to assemble training DataFrame of matching patient frames
-    train_df = patient_lists_to_dataframe(
-        patient_split.train,
-        manifest,
-        string_to_image_type(config.image_type),
-        args.images + "/Benign",
-        args.images + "/Malignant")
+        # Load the manifest file
+        try:
+            print("Loading manifest file from: {0}".format(args.manifest))
+            with file_io.FileIO(args.manifest, mode='r') as stream:
+                manifest = json.load(stream)
+        except NotFoundError as _:
+            print("Manifest file not found: {0}".format(args.manifest))
+            return
+        except Exception as _:
+            print("Unable to load manifest file: {0}".format(args.manifest))
+            return
         
-    # Shuffle the training DataFrame
-    train_df = train_df.sample(frac=1).reset_index(drop=True)
-    
-    # Print some sample information
-    print("Training DataFrame shape: {0}".format(train_df.shape))
-    print(train_df.iloc[0:5])
+        benign_patients, malignant_patients = patient_type_lists(manifest)
 
-    train_data_generator = ImageDataGenerator(**config.image_preprocessing.toDict())
-    test_data_generator = ImageDataGenerator(rescale=1./255)
+        # For local testing of models/configuration, limit to six patients of each type
+        if not args.job_dir:
+            print("Local training test. Limiting to six patients from each class.")
+            benign_patients = np.random.choice(benign_patients, 6, replace=False).tolist()
+            malignant_patients = np.random.choice(malignant_patients, 6, replace=False).tolist()
 
-    train_generator = train_data_generator.flow_from_dataframe(
-        dataframe = train_df,
-        directory = None,
-        x_col = "filename",
-        y_col = "class",
-        target_size = config.target_shape,
-        color_mode = "rgb",
-        class_mode = "categorical",
-        classes = TUMOR_TYPES,
-        batch_size = config.batch_size,
-        shuffle = True,
-        seed = config.random_seed,
-        drop_duplicates = False
-    )
+        # Train/test split according to config
+        patient_split = DotMap(patient_train_test_split(
+            benign_patients,
+            malignant_patients,
+            config.train_split,
+            validation_split = config.validation_split,
+            random_seed = config.random_seed
+        ))
 
-    # Assemble validation DataFrame if specified in config 
-    if config.validation_split:
-        validation_df = patient_lists_to_dataframe(
-            patient_split.validation,
+        tb_callback = TensorBoard(
+            log_dir=logs_path,
+            histogram_freq=0,
+            batch_size=config.batch_size,
+            write_graph=True,
+            write_grads=False,
+            write_images=False)
+
+        # Crawl the manifest to assemble training DataFrame of matching patient frames
+        train_df = patient_lists_to_dataframe(
+            patient_split.train,
             manifest,
             string_to_image_type(config.image_type),
             args.images + "/Benign",
             args.images + "/Malignant")
+            
+        # Shuffle the training DataFrame
+        train_df = train_df.sample(frac=1).reset_index(drop=True)
+        
+        # Print some sample information
+        print("Training DataFrame shape: {0}".format(train_df.shape))
+        print ("Training DataFrame sample rows:")
+        print(train_df.iloc[:2])
 
-        validation_df = validation_df.sample(frac=1).reset_index(drop=True)
+        train_data_generator = ImageDataGenerator(**config.image_preprocessing.toDict())
+        test_data_generator = ImageDataGenerator(rescale=1./255)
 
-        validation_generator = test_data_generator.flow_from_dataframe(
-            dataframe = validation_df,
+        train_generator = train_data_generator.flow_from_dataframe(
+            dataframe = train_df,
             directory = None,
             x_col = "filename",
             y_col = "class",
             target_size = config.target_shape,
             color_mode = "rgb",
-            class_mode = "categorical",
+            class_mode = "binary",
             classes = TUMOR_TYPES,
             batch_size = config.batch_size,
             shuffle = True,
             seed = config.random_seed,
             drop_duplicates = False
         )
-    else:
-        # Config does not specify validation split
-        validation_generator = None
 
-    # Load the model specified in config
-    model = import_module("models.{0}".format(config.model)).get_model(config)
+        # Assemble validation DataFrame if specified in config 
+        if config.validation_split:
+            validation_df = patient_lists_to_dataframe(
+                patient_split.validation,
+                manifest,
+                string_to_image_type(config.image_type),
+                args.images + "/Benign",
+                args.images + "/Malignant")
 
-    # model.summary()
-    model.compile(
-        optimizer=Adam(), # default Adam parameters for now
-        loss=config.loss,
-        metrics=['accuracy'])
+            validation_df = validation_df.sample(frac=1).reset_index(drop=True)
 
-    model.fit_generator(
-        train_generator,
-        steps_per_epoch=len(train_df) // config.batch_size,
-        epochs = 2, # Just for testing purposes
-        validation_data = validation_generator,
-        validation_steps=len(validation_df) // config.batch_size,
-        verbose = 2,
-        use_multiprocessing = True,
-        workers = args.num_workers,
-        callbacks = [tb_callback]
-    )
+            validation_generator = test_data_generator.flow_from_dataframe(
+                dataframe = validation_df,
+                directory = None,
+                x_col = "filename",
+                y_col = "class",
+                target_size = config.target_shape,
+                color_mode = "rgb",
+                class_mode = "binary",
+                classes = TUMOR_TYPES,
+                batch_size = config.batch_size,
+                shuffle = True,
+                seed = config.random_seed,
+                drop_duplicates = False
+            )
+        else:
+            # Config does not specify validation split
+            validation_generator = None
 
+        # Load the model specified in config
+        model = import_module("models.{0}".format(config.model)).get_model(config)
 
-    # Evaluate the model
+        model.summary()
 
-    # Save the model
-    # model.save(config.identifier)
-    
-    # # Save the model on GC storage
-    # with file_io.FileIO(config.identifier, mode='r') as input_f:
-    #     with file_io.FileIO(args.job_dir + "/{0}".format(config.identifier), mode='w+') as output_f:
-    #         output_f.write(input_f.read())
+        model.compile(
+            optimizer=Adam(), # default Adam parameters for now
+            loss=config.loss,
+            metrics=['accuracy'])
+
+        model.fit_generator(
+            train_generator,
+            steps_per_epoch=len(train_df) // config.batch_size,
+            epochs = config.training_epochs,
+            validation_data = validation_generator,
+            validation_steps=len(validation_df) // config.batch_size,
+            verbose = 2,
+            use_multiprocessing = True,
+            workers = args.num_workers,
+            callbacks = [tb_callback]
+        )
+
+        # Evaluate the model
+
+        # Save the model
+        # model.save(config.identifier)
+        
+        # # Save the model on GC storage
+        # with file_io.FileIO(config.identifier, mode='r') as input_f:
+        #     with file_io.FileIO(args.job_dir + "/{0}".format(config.identifier), mode='w+') as output_f:
+        #         output_f.write(input_f.read())
 
     return
 
