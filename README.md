@@ -55,3 +55,11 @@ Notice that the source code (/src) includes its own copy of keras-preprocessing.
     - `pil_image.open(path, mode='rb')` (*before*)
     - `pil_image.open(tensorflow.python.lib.io.ile_io.FileIO(path, mode='rb'))` (*after*)
 - Removes os file exist check from dataframe_iterator.py
+
+## Local Testing
+
+Execute the module as main (i.e. `python3 -m trainer.task`) to see argparse output detailing what arguments are needed to run the training module.
+
+An example execution of the training module that uses the "local.yaml" configuration file:
+
+`python3 -m trainer.task --images [../relative/path/from_current_directory_to_images] --manifest [../relative/path/from current_directory_to_manifest] --config config/local.yaml`

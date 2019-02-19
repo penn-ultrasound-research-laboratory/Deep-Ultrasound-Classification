@@ -7,7 +7,7 @@ MANIFEST="manifest.json"
 CONFIG_FILE="default.yaml" # will convert to arg at some point
 
 REGION="us-west1"
-SCALE_TIER="basic"
+SCALE_TIER="BASIC_GPU"
 
 now=$(date +"%Y%m%d_%H%M%S")
 JOB_NAME="grayscale_train_$now"
