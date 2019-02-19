@@ -163,7 +163,7 @@ def train_model(args):
             epochs = config.training_epochs,
             validation_data = validation_generator,
             validation_steps=len(validation_df) // config.batch_size,
-            verbose = 1,
+            verbose = 2,
             use_multiprocessing = True,
             workers = args.num_workers,
             callbacks = [tb_callback]

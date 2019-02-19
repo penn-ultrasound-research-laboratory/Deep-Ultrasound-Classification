@@ -1,4 +1,4 @@
-TRAINER_PACKAGE_PATH="/Users/Matthew/Documents/Research/ultrasound-ml-engine/src"
+TRAINER_PACKAGE_PATH="/Users/Matthew/Documents/Research/UltrasoundResearch/src"
 MAIN_TRAINER_MODULE="trainer.task"
 STORAGE_BUCKET="research-storage"
 
