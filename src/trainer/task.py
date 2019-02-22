@@ -3,6 +3,7 @@ import argparse
 import json
 import yaml
 import os
+import pkg_resources
 
 from dotmap import DotMap
 from datetime import datetime
@@ -153,7 +154,7 @@ def train_model(args):
         model.summary()
 
         model.compile(
-            optimizer=Adam(), # default Adam parameters for now
+            optimizer=Adam(lr=config.learning_rate), # default Adam parameters for now
             loss=config.loss,
             metrics=['accuracy'])
 
@@ -203,7 +204,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "-C",
         "--config",
-        help="Experiment config yaml. i.e. experiment definition in code. Located in /src/config",
+        help="Experiment config yaml. i.e. experiment definition in code. Must be place in /src/config directory.",
         default=None
     )
 
@@ -227,7 +228,12 @@ if __name__ == "__main__":
     parser.add_argument('--cuda', type=bool, default=True, help='enable CUDA')
     
     args=parser.parse_args()
-    arguments= DotMap(args.__dict__)
+    arguments = DotMap(args.__dict__)
+
+    if arguments.config:
+        arguments.config = pkg_resources.resource_filename(
+            __name__,
+            "{0}/{1}".format("../config", arguments.config))
 
     # Execute the model
     train_model(arguments)

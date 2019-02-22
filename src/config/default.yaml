@@ -1,7 +1,7 @@
 identifier: default
 image_type: GRAYSCALE
 model: vgg16
-target_shape: [48, 48]
+target_shape: [64, 64]
 pooling: max
 random_seed: 36
 train_split: 0.8  # training/validation ratio
@@ -9,7 +9,7 @@ validation_split: 0.1
 training_epochs: 20
 batch_size: 8
 optimizer: rmsp # Not used yet (optimizer)
-learning_rate: 1.0e-4 # Not used yet (optimizer)
+learning_rate: 1.0e-6
 decay_rate: 0.97 # Not used yet (optimizer)
 loss: binary_crossentropy
 image_preprocessing:
