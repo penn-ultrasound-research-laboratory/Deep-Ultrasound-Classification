@@ -1,19 +1,21 @@
 identifier: default
 image_type: GRAYSCALE
 model: vgg16
-target_shape: [48, 48]
+target_shape: [64, 64]
 pooling: max
-random_seed: 36
+random_seed: 29
 train_split: 0.5  # training/validation ratio
 validation_split: 0.25
 batch_size: 8
-training_epochs: 2
+training_epochs: 10
 optimizer: rmsp
 learning_rate: 1.0e-4
 decay_rate: 0.97
 test_interval: 1
 loss: binary_crossentropy
-image_preprocessing:
+image_preprocessing_train:
   rescale: 0.003921568627 # rescale all inputs by 1/255
   horizontal_flip: True
   vertical_flip: True
+image_preprocessing_test:
+    rescale: 0.003921568627 # rescale all inputs by 1/255

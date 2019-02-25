@@ -101,8 +101,8 @@ def train_model(args):
         print ("Training DataFrame sample rows:")
         print(train_df.iloc[:2])
 
-        train_data_generator = ImageDataGenerator(**config.image_preprocessing.toDict())
-        test_data_generator = ImageDataGenerator(rescale=1./255)
+        train_data_generator = ImageDataGenerator(**config.image_preprocessing_train.toDict())
+        test_data_generator = ImageDataGenerator(**config.image_preprocessing_test.toDict())
 
         train_generator = train_data_generator.flow_from_dataframe(
             dataframe = train_df,
@@ -118,6 +118,8 @@ def train_model(args):
             seed = config.random_seed,
             drop_duplicates = False
         )
+
+        # train_generator = crop_generator(train_generator, config.batch_size, config.target_shape, 10)
 
         # Assemble validation DataFrame if specified in config 
         if config.validation_split:
@@ -151,7 +153,7 @@ def train_model(args):
         # Load the model specified in config
         model = import_module("models.{0}".format(config.model)).get_model(config)
 
-        model.summary()
+        # model.summary()
 
         model.compile(
             optimizer=Adam(lr=config.learning_rate), # default Adam parameters for now
