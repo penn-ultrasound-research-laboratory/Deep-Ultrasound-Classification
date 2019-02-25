@@ -24,6 +24,7 @@ from pipeline.patientsample.patient_sample_generator import PatientSampleGenerat
 from utilities.partition.patient_partition import patient_train_test_split
 from utilities.general.general import default_none
 from utilities.manifest.manifest import patient_type_lists, patient_lists_to_dataframe
+from utilities.image.image import crop_generator
 
 DEFAULT_CONFIG = "../config/default.yaml"
 
@@ -119,7 +120,10 @@ def train_model(args):
             drop_duplicates = False
         )
 
-        # train_generator = crop_generator(train_generator, config.batch_size, config.target_shape, 10)
+        train_generator = crop_generator(
+            train_generator,
+            config.subsample_shape,
+            10)
 
         # Assemble validation DataFrame if specified in config 
         if config.validation_split:
