@@ -10,6 +10,7 @@ import warnings
 import numpy as np
 
 from tensorflow.python.lib.io import file_io
+from utilities.image.image import center_crop_auto_upscale
 
 try:
     from PIL import ImageEnhance
@@ -124,8 +125,13 @@ def load_img(path, grayscale=False, color_mode='rgb', target_size=None,
                         interpolation,
                         ", ".join(_PIL_INTERPOLATION_METHODS.keys())))
             resample = _PIL_INTERPOLATION_METHODS[interpolation]
-            img = img.resize(width_height_tuple, resample)
-    return img
+            
+            # Run user-defined method to ONLY upscale the image if a crop of 
+            # size target_size cannot be placed in the orginal image. Otherwise,
+            # DO NOT upscale, only crop the center of the image
+            img = center_crop_auto_upscale(img, target_size, resample=resample)
+
+    return pil_image.fromarray(img)
 
 
 def list_pictures(directory, ext=('jpg', 'jpeg', 'bmp', 'png', 'ppm', 'tif',

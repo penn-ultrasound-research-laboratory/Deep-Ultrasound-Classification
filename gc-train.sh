@@ -4,7 +4,7 @@ STORAGE_BUCKET="research-storage"
 
 DATASET="V2.0_Processed"
 MANIFEST="manifest.json"
-CONFIG_FILE="default.yaml" # will convert to arg at some point
+CONFIG_FILE="default.yaml" # should be specified as argument
 
 REGION="us-west1"
 SCALE_TIER="BASIC_GPU"
@@ -21,9 +21,6 @@ python_version=3.5
 IMAGES_PATH="gs://$STORAGE_BUCKET/$DATASET"
 MANIFEST_PATH="gs://$STORAGE_BUCKET/$MANIFEST"
 
-# Path to config
-MODEL_CONFIG_PATH="gs://$STORAGE_BUCKET/config/$CONFIG_FILE"
-
 # Number workers - will eventually be based on scale-tier
 NUM_WORKERS=2
 
@@ -39,5 +36,5 @@ gcloud ml-engine jobs submit training $JOB_NAME \
         -- \
         --images $IMAGES_PATH \
         --manifest $MANIFEST_PATH \
-        --config $MODEL_CONFIG_PATH \
+        --config $CONFIG_FILE \
         --num-workers $NUM_WORKERS

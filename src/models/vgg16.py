@@ -9,15 +9,8 @@ def get_model(config):
         weights='imagenet',
         input_shape=config.input_shape)
 
-    # Connect output pooling to dense layer with sigmoid activation
-    # Assumes binary crossentropy loss function
-    # model = Model(
-    #     inputs=model.inputs, outputs=Dense(
-    #         2,
-    #         input_shape=(512,),
-    #         activation="sigmoid",
-    #         name="predictions")(model.layers[-1].output)
-    # )
+    for layer in model.layers:
+        layer.trainable = False 
 
     x = model.get_layer('block5_conv3').output
     x = GlobalAveragePooling2D()(x)

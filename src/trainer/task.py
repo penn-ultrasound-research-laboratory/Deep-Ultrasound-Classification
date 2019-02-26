@@ -3,6 +3,7 @@ import argparse
 import json
 import yaml
 import os
+import pkg_resources
 
 from dotmap import DotMap
 from datetime import datetime
@@ -23,6 +24,7 @@ from pipeline.patientsample.patient_sample_generator import PatientSampleGenerat
 from utilities.partition.patient_partition import patient_train_test_split
 from utilities.general.general import default_none
 from utilities.manifest.manifest import patient_type_lists, patient_lists_to_dataframe
+from utilities.image.image import crop_generator
 
 DEFAULT_CONFIG = "../config/default.yaml"
 
@@ -79,6 +81,7 @@ def train_model(args):
         tb_callback = TensorBoard(
             log_dir=logs_path,
             histogram_freq=0,
+            update_freq="batch",
             batch_size=config.batch_size,
             write_graph=True,
             write_grads=False,
@@ -93,15 +96,17 @@ def train_model(args):
             args.images + "/Malignant")
             
         # Shuffle the training DataFrame
-        train_df = train_df.sample(frac=1).reset_index(drop=True)
+        # Not sure this is necessary, especially considering shuffle=True 
+        # in flow_from_dataframe()
+        # train_df = train_df.sample(frac=1).reset_index(drop=True)
         
         # Print some sample information
         print("Training DataFrame shape: {0}".format(train_df.shape))
         print ("Training DataFrame sample rows:")
         print(train_df.iloc[:2])
 
-        train_data_generator = ImageDataGenerator(**config.image_preprocessing.toDict())
-        test_data_generator = ImageDataGenerator(rescale=1./255)
+        train_data_generator = ImageDataGenerator(**config.image_preprocessing_train.toDict())
+        test_data_generator = ImageDataGenerator(**config.image_preprocessing_test.toDict())
 
         train_generator = train_data_generator.flow_from_dataframe(
             dataframe = train_df,
@@ -118,6 +123,11 @@ def train_model(args):
             drop_duplicates = False
         )
 
+        train_generator = crop_generator(
+            train_generator,
+            config.subsample_shape,
+            10)
+
         # Assemble validation DataFrame if specified in config 
         if config.validation_split:
             validation_df = patient_lists_to_dataframe(
@@ -127,7 +137,7 @@ def train_model(args):
                 args.images + "/Benign",
                 args.images + "/Malignant")
 
-            validation_df = validation_df.sample(frac=1).reset_index(drop=True)
+            # validation_df = validation_df.sample(frac=1).reset_index(drop=True)
 
             validation_generator = test_data_generator.flow_from_dataframe(
                 dataframe = validation_df,
@@ -150,10 +160,10 @@ def train_model(args):
         # Load the model specified in config
         model = import_module("models.{0}".format(config.model)).get_model(config)
 
-        model.summary()
+        # model.summary()
 
         model.compile(
-            optimizer=Adam(), # default Adam parameters for now
+            optimizer=Adam(lr=config.learning_rate), # default Adam parameters for now
             loss=config.loss,
             metrics=['accuracy'])
 
@@ -203,7 +213,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "-C",
         "--config",
-        help="Experiment config yaml. i.e. experiment definition in code. Located in /src/config",
+        help="Experiment config yaml. i.e. experiment definition in code. Must be place in /src/config directory.",
         default=None
     )
 
@@ -227,7 +237,12 @@ if __name__ == "__main__":
     parser.add_argument('--cuda', type=bool, default=True, help='enable CUDA')
     
     args=parser.parse_args()
-    arguments= DotMap(args.__dict__)
+    arguments = DotMap(args.__dict__)
+
+    if arguments.config:
+        arguments.config = pkg_resources.resource_filename(
+            __name__,
+            "{0}/{1}".format("../config", arguments.config))
 
     # Execute the model
     train_model(arguments)
