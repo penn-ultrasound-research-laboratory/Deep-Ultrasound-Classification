@@ -7,8 +7,8 @@ pooling: max
 random_seed: 29
 train_split: 0.5  # training/validation ratio
 validation_split: 0.25
+training_epochs: 20
 batch_size: 8
-training_epochs: 10
 optimizer: rmsp
 learning_rate: 1.0e-4
 decay_rate: 0.97

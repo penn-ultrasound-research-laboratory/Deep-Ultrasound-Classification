@@ -81,6 +81,7 @@ def train_model(args):
         tb_callback = TensorBoard(
             log_dir=logs_path,
             histogram_freq=0,
+            update_freq="batch",
             batch_size=config.batch_size,
             write_graph=True,
             write_grads=False,
@@ -95,7 +96,9 @@ def train_model(args):
             args.images + "/Malignant")
             
         # Shuffle the training DataFrame
-        train_df = train_df.sample(frac=1).reset_index(drop=True)
+        # Not sure this is necessary, especially considering shuffle=True 
+        # in flow_from_dataframe()
+        # train_df = train_df.sample(frac=1).reset_index(drop=True)
         
         # Print some sample information
         print("Training DataFrame shape: {0}".format(train_df.shape))
@@ -134,7 +137,7 @@ def train_model(args):
                 args.images + "/Benign",
                 args.images + "/Malignant")
 
-            validation_df = validation_df.sample(frac=1).reset_index(drop=True)
+            # validation_df = validation_df.sample(frac=1).reset_index(drop=True)
 
             validation_generator = test_data_generator.flow_from_dataframe(
                 dataframe = validation_df,
