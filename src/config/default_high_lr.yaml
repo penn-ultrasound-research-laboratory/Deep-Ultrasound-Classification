@@ -4,13 +4,13 @@ model: vgg16
 target_shape: [64, 64]
 subsample_shape: [48, 48]
 pooling: max
-random_seed: 29
+random_seed: 26
 train_split: 0.5  # training/validation ratio
 validation_split: 0.25
 training_epochs: 100
 batch_size: 16
 optimizer: rmsp # Not used yet (optimizer)
-learning_rate: 1.0e-4
+learning_rate: 1.0e-3
 decay_rate: 0.97 # Not used yet (optimizer)
 loss: binary_crossentropy
 image_preprocessing_train:

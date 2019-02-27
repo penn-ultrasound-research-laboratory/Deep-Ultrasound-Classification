@@ -63,3 +63,13 @@ Execute the module as main (i.e. `python3 -m trainer.task`) to see argparse outp
 An example execution of the training module that uses the "local.yaml" configuration file:
 
 `python3 -m trainer.task --images [../relative/path/from_current_directory_to_images] --manifest [../relative/path/from current_directory_to_manifest] --config config/local.yaml`
+
+## Google Cloud Training
+
+Run the "gc-train.py" script via command line to push a new training job to Google Cloud. NOTE: Examine the file gc-train.py file. Some user configuration IS required - i.e. setting your local path and bucket name. 
+
+Run the script via command line with `python3 -m gc-train [arguments]`
+
+Example:
+
+`python3 -m gc-train -I V1.0 -M manifest.json -C default`
