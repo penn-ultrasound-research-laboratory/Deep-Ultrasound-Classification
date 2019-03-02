@@ -31,12 +31,11 @@ DEFAULT_CONFIG = "../config/default.yaml"
 
 def train_model(args):
 
-    TIMESTAMP = datetime.now().isoformat()
     IN_LOCAL_TRAINING_MODE = not args.job_dir
     JOB_DIR = default_none(args.job_dir, ".")
-    LOGS_PATH = "{0}/logs/{1}".format(JOB_DIR, TIMESTAMP)
+    LOGS_PATH = "{0}/logs".format(JOB_DIR)
     CONFIG_FILE = default_none(args.config, DEFAULT_CONFIG)
-    MODEL_FILE = "{0}_{1}.h5".format(CONFIG_FILE, TIMESTAMP)
+    MODEL_FILE = "{0}.h5".format(CONFIG_FILE)
     GC_MODEL_SAVE_PATH = "{0}/model/{1}".format(JOB_DIR, MODEL_FILE)
 
     with tf.device('/device:GPU:0'):
