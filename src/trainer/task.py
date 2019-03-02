@@ -101,7 +101,10 @@ def train_model(args):
 
         # Print some sample information
         print("Training DataFrame shape: {0}".format(train_df.shape))
-        print("Training DataFrame sample rows:")
+        print("Training DataFrame class breakdown")
+        print(train_df["class"].value_counts())
+       
+
         print(train_df.iloc[:2])
 
         train_data_generator = ImageDataGenerator(
@@ -137,6 +140,9 @@ def train_model(args):
                 string_to_image_type(config.image_type),
                 args.images + "/Benign",
                 args.images + "/Malignant")
+
+            print("Validation DataFrame class breakdown")
+            print(validation_df["class"].value_counts())
 
             validation_generator = test_data_generator.flow_from_dataframe(
                 dataframe=validation_df,
