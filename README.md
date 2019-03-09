@@ -72,4 +72,4 @@ Run the script via command line with `python3 -m gc-train [arguments]`
 
 Example:
 
-`python3 -m gc-train -I V1.0 -M manifest.json -C default`
+`python3 -m gc-train -I V1.0 -M manifest.json -C default.yaml`
