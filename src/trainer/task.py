@@ -127,10 +127,12 @@ def train_model(args):
             drop_duplicates=False
         )
 
-        train_generator = crop_generator(
-            train_generator,
-            config.subsample_shape,
-            10)
+        # Optional: subsample each input to batch of randomly placed crops
+        if config.subsample.subsample_shape:
+            train_generator = crop_generator(
+                train_generator,
+                config.subsample.subsample_shape,
+                config.subsample.subsample_batch_size)
 
         # Assemble validation DataFrame if specified in config
         if config.validation_split:
