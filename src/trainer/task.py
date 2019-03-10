@@ -134,7 +134,7 @@ def train_model(args):
                 config.subsample.subsample_shape,
                 config.subsample.subsample_batch_size)
 
-        # Assemble validation DataFrame if specified in config
+        # Optional: assemble validation DataFrame and validation generator
         if config.validation_split:
             validation_df = patient_lists_to_dataframe(
                 patient_split.validation,

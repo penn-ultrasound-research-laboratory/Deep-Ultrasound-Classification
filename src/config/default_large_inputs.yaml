@@ -1,24 +1,23 @@
-identifier: local
+identifier: default_large_inputs
 image_type: GRAYSCALE
 model: vgg16
-target_shape: [64, 64]
+target_shape: [300, 300]
 pooling: max
 random_seed: 29
 train_split: 0.5  # training/validation ratio
 validation_split: 0.25
-training_epochs: 20
-batch_size: 8
-optimizer: rmsp
+training_epochs: 100
+batch_size: 16
+optimizer: rmsp # Not used yet (optimizer)
 learning_rate: 1.0e-4
-decay_rate: 0.97
-test_interval: 1
+decay_rate: 0.97 # Not used yet (optimizer)
 loss: binary_crossentropy
 image_preprocessing_train:
   rescale: 0.003921568627 # rescale all inputs by 1/255
   horizontal_flip: True
   vertical_flip: True
 image_preprocessing_test:
-    rescale: 0.003921568627 # rescale all inputs by 1/255
+  rescale: 0.003921568627 # rescale all inputs by 1/255
 subsample:
-  subsample_shape: [48, 48]
+  subsample_shape: [256, 256]
   subsample_batch_size: 10

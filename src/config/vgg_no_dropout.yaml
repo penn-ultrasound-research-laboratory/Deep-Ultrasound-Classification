@@ -1,4 +1,4 @@
-identifier: default
+identifier: vgg_no_dropout
 image_type: GRAYSCALE
 model: vgg16_no_dropout
 target_shape: [64, 64]
