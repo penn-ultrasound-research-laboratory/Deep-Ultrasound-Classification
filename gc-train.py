@@ -18,9 +18,14 @@ def google_cloud_train(args):
     DATASET=args["images"]
     MANIFEST=args["manifest"]
     CONFIG_FILE=args["config"]
+    
+    if args["identifier"]:
+        JOB_BASE_NAME=args["identifier"]
+    else:
+        JOB_BASE_NAME="train"
 
     NOW=datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-    JOB_NAME="grayscale_train_{0}".format(NOW)
+    JOB_NAME="{0}_{1}".format(JOB_BASE_NAME, NOW)
     JOB_DIR="gs://{0}/staging/{1}".format(STORAGE_BUCKET, JOB_NAME)
 
     # Paths to images
@@ -72,6 +77,13 @@ if __name__ == "__main__":
         "-C",
         "--config",
         help="Experiment config yaml. i.e. experiment definition in code. Must be place in /src/config directory.",
+        default=None
+    )
+
+    parser.add_argument(
+        "-i",
+        "--identifier",
+        help="Base name to identify job in Google Cloud Storage & ML Engine",
         default=None
     )
 
