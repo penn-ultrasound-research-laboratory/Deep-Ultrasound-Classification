@@ -48,7 +48,8 @@ def google_cloud_train(args):
             "--images", IMAGES_PATH,
             "--manifest", MANIFEST_PATH,
             "--config", CONFIG_FILE,
-            "--num-workers", NUM_WORKERS]
+            "--num-workers", NUM_WORKERS,
+            "--identifier", JOB_BASE_NAME]
 
     command = [str(s) for s in command]
 
