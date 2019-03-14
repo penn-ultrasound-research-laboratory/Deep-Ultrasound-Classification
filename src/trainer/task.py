@@ -168,18 +168,19 @@ def train_model(args):
         model = import_module("models.{0}".format(
             config.model)).get_model(config)
 
-        # model.summary()
+        ######################################################
+        # Fine tune stage zero: bottleneck features
+        ######################################################
 
         model.compile(
-            # default Adam parameters for now
-            optimizer=Adam(lr=config.learning_rate),
+            optimizer=Adam(lr=config.learning_rate_stage_zero),
             loss=config.loss,
             metrics=['accuracy'])
 
         model.fit_generator(
             train_generator,
             steps_per_epoch=len(train_df) // config.batch_size,
-            epochs=config.training_epochs,
+            epochs=config.training_epochs_stage_zero,
             validation_data=validation_generator,
             validation_steps=len(validation_df) // config.batch_size,
             verbose=2,
@@ -188,15 +189,40 @@ def train_model(args):
             callbacks=[tb_callback]
         )
         
+        ######################################################
+        # Fine tune stage one: last convolutional block
+        ######################################################
+
+        for i, layer in enumerate(model.layers):
+            if i > config.first_trainable_layer_index_stage_one:
+                layer.trainable = True
+
+        model.compile(
+            optimizer=Adam(lr=config.learning_rate_stage_one),
+            loss=config.loss,
+            metrics=['accuracy'])
+        
+        model.fit_generator(
+            train_generator,
+            steps_per_epoch=len(train_df) // config.batch_size,
+            epochs=config.training_epochs_stage_one,
+            validation_data=validation_generator,
+            validation_steps=len(validation_df) // config.batch_size,
+            verbose=2,
+            use_multiprocessing=True,
+            workers=args.num_workers,
+            callbacks=[tb_callback]
+        )
+
         # Save the model
-        model.save(MODEL_FILE)
+        model.save_weights(MODEL_FILE)
 
         # Save the model on GC storage in cloud mode
         if not IN_LOCAL_TRAINING_MODE:
             with file_io.FileIO(MODEL_FILE, mode="rb") as input_f:
                 with file_io.FileIO(GC_MODEL_SAVE_PATH, mode="wb+") as output_f:
                     output_f.write(input_f.read())
-            print("Model saved to {0}".format(GC_MODEL_SAVE_PATH))
+            print("Model weights saved to {0}".format(GC_MODEL_SAVE_PATH))
 
         print("Training Complete")
 

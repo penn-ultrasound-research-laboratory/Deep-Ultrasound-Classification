@@ -1,0 +1,24 @@
+identifier: inception_v3_zca_no_dropout
+image_type: GRAYSCALE
+model: inceptionv3_no_dropout
+target_shape: [300, 300]
+pooling: max
+random_seed: 29
+train_split: 0.7  # training/validation ratio
+validation_split: 0.20
+training_epochs: 100
+batch_size: 16
+optimizer: rmsp # Not used yet (optimizer)
+learning_rate: 1.0e-4
+decay_rate: 0.97 # Not used yet (optimizer)
+loss: binary_crossentropy
+image_preprocessing_train:
+  rescale: 0.003921568627 # rescale all inputs by 1/255
+  horizontal_flip: True
+  vertical_flip: True
+  samplewise_center: True
+  zca_whitening: True
+image_preprocessing_test:
+  rescale: 0.003921568627 # rescale all inputs by 1/255
+  samplewise_center: True
+  zca_whitening: True
