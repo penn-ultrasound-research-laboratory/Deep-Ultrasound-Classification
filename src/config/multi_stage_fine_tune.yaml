@@ -1,0 +1,25 @@
+identifier: inception_v3_multi_stage_fine_tune
+image_type: GRAYSCALE
+model: inceptionv3
+target_shape: [300, 300]
+pooling: max
+random_seed: 29
+train_split: 0.7  # training/validation ratio
+validation_split: 0.20
+training_epochs_stage_zero: 20
+training_epochs_stage_one: 100
+first_trainable_layer_index_stage_one: 279
+batch_size: 16
+learning_rate_stage_zero: 1.0e-3
+learning_rate_stage_one: 1.0e-4
+loss: binary_crossentropy
+image_preprocessing_train:
+  rescale: 0.003921568627 # rescale all inputs by 1/255
+  horizontal_flip: True
+  vertical_flip: True
+  samplewise_center: True
+  zca_whitening: True
+image_preprocessing_test:
+  rescale: 0.003921568627 # rescale all inputs by 1/255
+  samplewise_center: True
+  zca_whitening: True

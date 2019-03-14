@@ -35,7 +35,7 @@ def train_model(args):
     JOB_DIR = default_none(args.job_dir, ".")
     LOGS_PATH = "{0}/logs".format(JOB_DIR)
     CONFIG_FILE = default_none(args.config, DEFAULT_CONFIG)
-    MODEL_FILE = "model.h5"
+    MODEL_FILE = "{0}.h5".format(args.identifier)
     GC_MODEL_SAVE_PATH = "{0}/model/{1}".format(JOB_DIR, MODEL_FILE)
 
     with tf.device('/device:GPU:0'):
@@ -127,12 +127,14 @@ def train_model(args):
             drop_duplicates=False
         )
 
-        train_generator = crop_generator(
-            train_generator,
-            config.subsample_shape,
-            10)
+        # Optional: subsample each input to batch of randomly placed crops
+        if config.subsample.subsample_shape:
+            train_generator = crop_generator(
+                train_generator,
+                config.subsample.subsample_shape,
+                config.subsample.subsample_batch_size)
 
-        # Assemble validation DataFrame if specified in config
+        # Optional: assemble validation DataFrame and validation generator
         if config.validation_split:
             validation_df = patient_lists_to_dataframe(
                 patient_split.validation,
@@ -166,18 +168,19 @@ def train_model(args):
         model = import_module("models.{0}".format(
             config.model)).get_model(config)
 
-        # model.summary()
+        ######################################################
+        # Fine tune stage zero: bottleneck features
+        ######################################################
 
         model.compile(
-            # default Adam parameters for now
-            optimizer=Adam(lr=config.learning_rate),
+            optimizer=Adam(lr=config.learning_rate_stage_zero),
             loss=config.loss,
             metrics=['accuracy'])
 
         model.fit_generator(
             train_generator,
             steps_per_epoch=len(train_df) // config.batch_size,
-            epochs=config.training_epochs,
+            epochs=config.training_epochs_stage_zero,
             validation_data=validation_generator,
             validation_steps=len(validation_df) // config.batch_size,
             verbose=2,
@@ -186,15 +189,40 @@ def train_model(args):
             callbacks=[tb_callback]
         )
         
+        ######################################################
+        # Fine tune stage one: last convolutional block
+        ######################################################
+
+        for i, layer in enumerate(model.layers):
+            if i > config.first_trainable_layer_index_stage_one:
+                layer.trainable = True
+
+        model.compile(
+            optimizer=Adam(lr=config.learning_rate_stage_one),
+            loss=config.loss,
+            metrics=['accuracy'])
+        
+        model.fit_generator(
+            train_generator,
+            steps_per_epoch=len(train_df) // config.batch_size,
+            epochs=config.training_epochs_stage_one,
+            validation_data=validation_generator,
+            validation_steps=len(validation_df) // config.batch_size,
+            verbose=2,
+            use_multiprocessing=True,
+            workers=args.num_workers,
+            callbacks=[tb_callback]
+        )
+
         # Save the model
-        model.save(MODEL_FILE)
+        model.save_weights(MODEL_FILE)
 
         # Save the model on GC storage in cloud mode
         if not IN_LOCAL_TRAINING_MODE:
             with file_io.FileIO(MODEL_FILE, mode="rb") as input_f:
                 with file_io.FileIO(GC_MODEL_SAVE_PATH, mode="wb+") as output_f:
                     output_f.write(input_f.read())
-            print("Model saved to {0}".format(GC_MODEL_SAVE_PATH))
+            print("Model weights saved to {0}".format(GC_MODEL_SAVE_PATH))
 
         print("Training Complete")
 
@@ -236,6 +264,13 @@ if __name__ == "__main__":
         "-j",
         "--job-dir",
         help="the directory for logging in GC",
+        default=None
+    )
+
+    parser.add_argument(
+        "-i",
+        "--identifier",
+        help="Base name to identify job in Google Cloud Storage & ML Engine",
         default=None
     )
 

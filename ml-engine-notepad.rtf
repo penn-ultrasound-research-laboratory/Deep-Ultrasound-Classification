@@ -12,3 +12,9 @@ gcloud auth application-default login
 
 # LOCAL TESTING PROCEDURE
 python3 -m trainer.task --images ../../Dataset/V2.0_Processed --manifest ../../Dataset/V2.0_Processed/manifest.json --config config/default.yaml
+
+# Cleaning up dataset directory
+
+find ../../Research/Dataset/V3.0_Processed -type d | grep frames$ | xargs -L 1 python3 -m cropall
+
+find . | grep .*/frames/frame.*.png | xargs rm
