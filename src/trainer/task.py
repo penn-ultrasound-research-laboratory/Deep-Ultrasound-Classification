@@ -104,9 +104,6 @@ def train_model(args):
         print("Training DataFrame class breakdown")
         print(train_df["class"].value_counts())
        
-
-        print(train_df.iloc[:2])
-
         train_data_generator = ImageDataGenerator(
             **config.image_preprocessing_train.toDict())
         test_data_generator = ImageDataGenerator(
@@ -168,51 +165,39 @@ def train_model(args):
         model = import_module("models.{0}".format(
             config.model)).get_model(config)
 
-        ######################################################
-        # Fine tune stage zero: bottleneck features
-        ######################################################
-
         model.compile(
-            optimizer=Adam(lr=config.learning_rate_stage_zero),
+            optimizer=Adam(lr=config.learning_rate),
             loss=config.loss,
             metrics=['accuracy'])
 
-        model.fit_generator(
-            train_generator,
-            steps_per_epoch=len(train_df) // config.batch_size,
-            epochs=config.training_epochs_stage_zero,
-            validation_data=validation_generator,
-            validation_steps=len(validation_df) // config.batch_size,
-            verbose=2,
-            use_multiprocessing=True,
-            workers=args.num_workers,
-            callbacks=[tb_callback]
-        )
-        
-        ######################################################
-        # Fine tune stage one: last convolutional block
-        ######################################################
-
-        for i, layer in enumerate(model.layers):
-            if i > config.first_trainable_layer_index_stage_one:
-                layer.trainable = True
-
-        model.compile(
-            optimizer=Adam(lr=config.learning_rate_stage_one),
-            loss=config.loss,
-            metrics=['accuracy'])
-        
-        model.fit_generator(
-            train_generator,
-            steps_per_epoch=len(train_df) // config.batch_size,
-            epochs=config.training_epochs_stage_one,
-            validation_data=validation_generator,
-            validation_steps=len(validation_df) // config.batch_size,
-            verbose=2,
-            use_multiprocessing=True,
-            workers=args.num_workers,
-            callbacks=[tb_callback]
-        )
+        if config.fine_tune:
+            for layer_name, epochs in config.fine_tune:
+                # Set the next layer down as Trainable
+                model.get_layer(layer_name).trainable = True
+                # Fit the generator with this number of epochs
+                model.fit_generator(
+                    train_generator,
+                    steps_per_epoch=len(train_df) // config.batch_size,
+                    epochs=epochs,
+                    validation_data=validation_generator,
+                    validation_steps=len(validation_df) // config.batch_size,
+                    verbose=2,
+                    use_multiprocessing=True,
+                    workers=args.num_workers,
+                    callbacks=[tb_callback]
+                )
+        else:
+            model.fit_generator(
+                train_generator,
+                steps_per_epoch=len(train_df) // config.batch_size,
+                epochs=config.training_epochs,
+                validation_data=validation_generator,
+                validation_steps=len(validation_df) // config.batch_size,
+                verbose=2,
+                use_multiprocessing=True,
+                workers=args.num_workers,
+                callbacks=[tb_callback]
+            )
 
         # Save the model
         model.save_weights(MODEL_FILE)
@@ -223,9 +208,6 @@ def train_model(args):
                 with file_io.FileIO(GC_MODEL_SAVE_PATH, mode="wb+") as output_f:
                     output_f.write(input_f.read())
             print("Model weights saved to {0}".format(GC_MODEL_SAVE_PATH))
-
-        print("Training Complete")
-
 
 if __name__ == "__main__":
 
