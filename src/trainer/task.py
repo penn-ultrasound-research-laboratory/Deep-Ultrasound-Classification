@@ -170,6 +170,18 @@ def train_model(args):
             loss=config.loss,
             metrics=['accuracy'])
 
+        model.fit_generator(
+            train_generator,
+            steps_per_epoch=len(train_df) // config.batch_size,
+            epochs=config.training_epochs,
+            validation_data=validation_generator,
+            validation_steps=len(validation_df) // config.batch_size,
+            verbose=2,
+            use_multiprocessing=True,
+            workers=args.num_workers,
+            callbacks=[tb_callback]
+        )
+
         if config.fine_tune:
             for layer_name, epochs in config.fine_tune:
                 print("Setting layer {0} to trainable. Train for {1} epochs".format(layer_name, epochs))
@@ -194,18 +206,6 @@ def train_model(args):
                     workers=args.num_workers,
                     callbacks=[tb_callback]
                 )
-        else:
-            model.fit_generator(
-                train_generator,
-                steps_per_epoch=len(train_df) // config.batch_size,
-                epochs=config.training_epochs,
-                validation_data=validation_generator,
-                validation_steps=len(validation_df) // config.batch_size,
-                verbose=2,
-                use_multiprocessing=True,
-                workers=args.num_workers,
-                callbacks=[tb_callback]
-            )
 
         # Save the model
         model.save_weights(MODEL_FILE)

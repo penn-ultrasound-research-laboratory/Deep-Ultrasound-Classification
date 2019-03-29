@@ -5,8 +5,8 @@ target_shape: [325, 325]
 random_seed: 34
 train_split: 0.8  # training/validation ratio
 validation_split: 0.2
-training_epochs: 10
-fine_tune: [[block5_conv3, 10]]
+training_epochs: 30
+fine_tune: [[block5_conv3, 20]]
 batch_size: 16
 learning_rate: 1.0e-4
 loss: binary_crossentropy
