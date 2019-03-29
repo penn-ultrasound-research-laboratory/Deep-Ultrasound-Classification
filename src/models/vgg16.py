@@ -1,13 +1,26 @@
 from keras.applications.vgg16 import VGG16
 from keras.layers import Activation, Dropout, Flatten, Dense, GlobalAveragePooling2D
 from keras.models import Model
-
+from tensorflow.python.lib.io import file_io
 
 def get_model(config):
     model = VGG16(
         include_top=False,
-        weights='imagenet',
+        weights=None,
         input_shape=config.input_shape)
+
+    # Fetch weights from Google Cloud Storage to save download time 
+    model_weights = file_io.FileIO(
+        'gs://research-storage/weights/vgg16_weights_tf_dim_ordering_tf_kernels_notop.h5',
+        mode='rb')
+
+    temp_model_weights = './temp_weights.h5'
+    temp_weights_file = open(temp_model_weights, 'wb')
+    temp_weights_file.write(model_weights.read())
+    temp_weights_file.close()
+    model_weights.close()
+
+    model.load_weights(temp_model_weights)
 
     for layer in model.layers:
         layer.trainable = False 

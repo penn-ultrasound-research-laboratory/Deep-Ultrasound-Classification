@@ -172,8 +172,16 @@ def train_model(args):
 
         if config.fine_tune:
             for layer_name, epochs in config.fine_tune:
+                print("Setting layer {0} to trainable. Train for {1} epochs".format(layer_name, epochs))
                 # Set the next layer down as Trainable
                 model.get_layer(layer_name).trainable = True
+
+                # Recompile the model to reflect new trainable layer
+                model.compile(
+                    optimizer=Adam(lr=config.learning_rate),
+                    loss=config.loss,
+                    metrics=['accuracy'])
+
                 # Fit the generator with this number of epochs
                 model.fit_generator(
                     train_generator,
