@@ -3,20 +3,28 @@ image_type: GRAYSCALE
 model: vgg16
 target_shape: [325, 325]
 random_seed: 34
-train_split: 0.8  # training/validation ratio
+# training/validation ratio
+train_split: 0.8
 validation_split: 0.2
-training_epochs: 30
-fine_tune: [[block5_conv3, 20]]
+training_epochs: 20
+fine_tune: [[block5_conv3, 30]]
 batch_size: 16
 learning_rate: 1.0e-4
 loss: binary_crossentropy
 image_preprocessing_train:
-  rescale: 0.003921568627 # rescale all inputs by 1/255
+  rescale: 0.003921568627
   horizontal_flip: True
   vertical_flip: True
   samplewise_center: True
   zca_whitening: True
 image_preprocessing_test:
-  rescale: 0.003921568627 # rescale all inputs by 1/255
+  rescale: 0.003921568627
   samplewise_center: True
   zca_whitening: True
+callbacks:
+  early_stop:
+    monitor: acc
+    min_delta: 0.005
+    patience: 5
+    mode: max
+    restore_best_weights: True
