@@ -10,6 +10,9 @@ import numpy as np
 
 def train_test_validation_indices(train_split, validation_split, N, random_seed=None):
 
+    if random_seed:
+        np.random.seed(random_seed)
+
     splits = np.floor(np.array([train_split * N, validation_split * N])).astype(np.uint8)
     indices =  np.arange(N)
     np.random.shuffle(indices)
@@ -17,6 +20,9 @@ def train_test_validation_indices(train_split, validation_split, N, random_seed=
     return np.split(indices, np.cumsum(splits))
 
 def train_test_split_indices(train_split, N, random_seed=None):
+
+    if random_seed:
+        np.random.seed(random_seed)
 
     splits = np.floor([train_split * N]).astype(np.uint8)
     indices =  np.arange(N)
@@ -45,9 +51,6 @@ def patient_train_test_split(
         Dictionary containing arrays: benign_train, benign_test, benign_cval,
             malignant_train, malignant_test, malignant_cval
     """
-
-    if random_seed:
-        np.random.seed(random_seed)
 
     num_benign = len(benign_patients)
     num_malignant = len(malignant_patients)

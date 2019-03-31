@@ -63,6 +63,11 @@ def train_model(args):
         print("Unable to load manifest file: {0}".format(args.manifest))
         return
 
+    np.random.seed(config.random_seed)
+    tf.set_random_seed(config.random_seed)
+
+    EPOCH_COUNT = config.training_epochs
+
     tb_callback = TensorBoard(
         log_dir=LOGS_PATH,
         batch_size=config.batch_size,
@@ -164,6 +169,15 @@ def train_model(args):
         # Config does not specify validation split
         validation_generator = None
 
+    if not IN_LOCAL_TRAINING_MODE:
+        # Save the training data on GC storage
+        with file_io.FileIO(GC_TRAIN_DF_SAVE_PATH, mode="wb+") as output_f:
+            train_df.to_csv(output_f)
+
+        # Save the validation data on GC storage
+        with file_io.FileIO(GC_VALIDATION_DF_SAVE_PATH, mode="wb+") as output_f:
+            validation_df.to_csv(output_f)
+
     with tf.device('/device:GPU:0'):
 
         # Load the model specified in config
@@ -183,7 +197,7 @@ def train_model(args):
             validation_data=validation_generator,
             validation_steps=len(validation_df) // config.batch_size,
             verbose=2,
-            use_multiprocessing=True,
+            use_multiprocessing=False,
             workers=args.num_workers,
             callbacks=[early_stop_callback, tb_callback]
         )
@@ -209,10 +223,13 @@ def train_model(args):
                     validation_data=validation_generator,
                     validation_steps=len(validation_df) // config.batch_size,
                     verbose=2,
-                    use_multiprocessing=True,
+                    use_multiprocessing=False,
                     workers=args.num_workers,
-                    callbacks=[tb_callback]
+                    callbacks=[early_stop_callback, tb_callback],
+                    initial_epoch = EPOCH_COUNT + 1
                 )
+
+                EPOCH_COUNT += epochs
 
         # Save the model
         model.save_weights(MODEL_FILE)
@@ -222,14 +239,6 @@ def train_model(args):
             with file_io.FileIO(MODEL_FILE, mode="rb") as input_f:
                 with file_io.FileIO(GC_MODEL_SAVE_PATH, mode="wb+") as output_f:
                     output_f.write(input_f.read())
-
-            # Save the training data on GC storage
-            with file_io.FileIO(GC_TRAIN_DF_SAVE_PATH, mode="wb+") as output_f:
-                train_df.to_csv(output_f)
-
-            # Save the validation data on GC storage
-            with file_io.FileIO(GC_VALIDATION_DF_SAVE_PATH, mode="wb+") as output_f:
-                validation_df.to_csv(output_f)
 
 
 if __name__ == "__main__":
