@@ -206,8 +206,17 @@ def train_model(args):
         if config.fine_tune:
             for layer_name, epochs in config.fine_tune:
                 print("Setting layer {0} to trainable. Train for {1} epochs".format(layer_name, epochs))
+                
                 # Set the next layer down as Trainable
                 model.get_layer(layer_name).trainable = True
+
+                # Reset the early stopping callback
+                early_stop_callback = EarlyStopping(
+                    monitor=config.callbacks.early_stop.monitor,
+                    min_delta=config.callbacks.early_stop.min_delta,
+                    patience=config.callbacks.early_stop.patience,
+                    mode=config.callbacks.early_stop.mode,
+                    restore_best_weights=config.callbacks.early_stop.restore_best_weights)
 
                 # Recompile the model to reflect new trainable layer
                 model.compile(
@@ -230,6 +239,7 @@ def train_model(args):
                 )
 
                 EPOCH_COUNT += epochs
+
 
         # Save the model
         model.save_weights(MODEL_FILE)
