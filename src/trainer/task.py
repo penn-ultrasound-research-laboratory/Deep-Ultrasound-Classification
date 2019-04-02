@@ -11,6 +11,7 @@ from importlib import import_module
 
 import tensorflow as tf
 import numpy as np
+import pandas as pd
 
 from tensorflow.python.lib.io import file_io
 from tensorflow.python.framework.errors_impl import NotFoundError
@@ -35,9 +36,11 @@ def train_model(args):
     MODEL_FILE = "{0}.h5".format(args.identifier)
     TRAIN_DF_FILE = "{0}_train.csv".format(args.identifier)
     VALIDATION_DF_FILE = "{0}_validation.csv".format(args.identifier)
+    HISTORY_DF_FILE = "{0}_history.csv".format(args.identifier)
     GC_MODEL_SAVE_PATH = "{0}/model/{1}".format(JOB_DIR, MODEL_FILE)
     GC_TRAIN_DF_SAVE_PATH = "{0}/data/{1}".format(JOB_DIR, TRAIN_DF_FILE)
     GC_VALIDATION_DF_SAVE_PATH = "{0}/data/{1}".format(JOB_DIR, VALIDATION_DF_FILE)
+    GC_HISTORY_DF_SAVE_PATH = "{0}/data/{1}".format(JOB_DIR, HISTORY_DF_FILE)
 
     # Load the configuration file yaml file if provided
     try:
@@ -66,19 +69,10 @@ def train_model(args):
     np.random.seed(config.random_seed)
     tf.set_random_seed(config.random_seed)
 
-    EPOCH_COUNT = config.training_epochs
-
     tb_callback = TensorBoard(
         log_dir=LOGS_PATH,
         batch_size=config.batch_size,
         write_graph=False)
-
-    early_stop_callback = EarlyStopping(
-        monitor=config.callbacks.early_stop.monitor,
-        min_delta=config.callbacks.early_stop.min_delta,
-        patience=config.callbacks.early_stop.patience,
-        mode=config.callbacks.early_stop.mode,
-        restore_best_weights=config.callbacks.early_stop.restore_best_weights)
 
     benign_patients, malignant_patients = patient_type_lists(manifest)
 
@@ -190,56 +184,45 @@ def train_model(args):
             metrics=['accuracy'])
 
         # Train the classifier on top of the base model
-        model.fit_generator(
+        history = model.fit_generator(
             train_generator,
             steps_per_epoch=len(train_df) // config.batch_size,
             epochs=config.training_epochs,
             validation_data=validation_generator,
             validation_steps=len(validation_df) // config.batch_size,
             verbose=2,
-            use_multiprocessing=False,
-            workers=args.num_workers,
-            callbacks=[early_stop_callback, tb_callback]
+            use_multiprocessing=True,
+            workers=args.num_workers
         )
 
         # Fine tune the base model if specified in config
         if config.fine_tune:
-            for layer_name, epochs in config.fine_tune:
-                print("Setting layer {0} to trainable. Train for {1} epochs".format(layer_name, epochs))
-                
+            for layer_name in config.fine_tune.layers:                
+                print("Setting layer {0} trainable".format(layer_name))
                 # Set the next layer down as Trainable
                 model.get_layer(layer_name).trainable = True
+                       
+            # Recompile the model to reflect new trainable layer
+            model.compile(
+                optimizer=Adam(lr=config.fine_tune.learning_rate),
+                loss=config.loss,
+                metrics=['accuracy'])
 
-                # Reset the early stopping callback
-                early_stop_callback = EarlyStopping(
-                    monitor=config.callbacks.early_stop.monitor,
-                    min_delta=config.callbacks.early_stop.min_delta,
-                    patience=config.callbacks.early_stop.patience,
-                    mode=config.callbacks.early_stop.mode,
-                    restore_best_weights=config.callbacks.early_stop.restore_best_weights)
+            start_epoch = history.params['epochs']
+            print("Starting fine-tune training at epoch: {0}".format(start_epoch))
 
-                # Recompile the model to reflect new trainable layer
-                model.compile(
-                    optimizer=Adam(lr=config.learning_rate),
-                    loss=config.loss,
-                    metrics=['accuracy'])
-
-                # Fit the generator with this number of epochs
-                model.fit_generator(
-                    train_generator,
-                    steps_per_epoch=len(train_df) // config.batch_size,
-                    epochs=epochs,
-                    validation_data=validation_generator,
-                    validation_steps=len(validation_df) // config.batch_size,
-                    verbose=2,
-                    use_multiprocessing=False,
-                    workers=args.num_workers,
-                    callbacks=[early_stop_callback, tb_callback],
-                    initial_epoch = EPOCH_COUNT + 1
-                )
-
-                EPOCH_COUNT += epochs
-
+            # Fit the generator with this number of epochs
+            history = model.fit_generator(
+                train_generator,
+                steps_per_epoch=len(train_df) // config.batch_size,
+                epochs=config.fine_tune.epochs,
+                validation_data=validation_generator,
+                validation_steps=len(validation_df) // config.batch_size,
+                verbose=2,
+                use_multiprocessing=True,
+                workers=args.num_workers,
+                callbacks=[tb_callback]
+            )
 
         # Save the model
         model.save_weights(MODEL_FILE)
@@ -250,6 +233,9 @@ def train_model(args):
                 with file_io.FileIO(GC_MODEL_SAVE_PATH, mode="wb+") as output_f:
                     output_f.write(input_f.read())
 
+            # Save the training history on GC storage
+            with file_io.FileIO(GC_HISTORY_DF_SAVE_PATH, mode="wb+") as output_f:
+                pd.DataFrame(history.history).to_csv(output_f, index=False)
 
 if __name__ == "__main__":
 
