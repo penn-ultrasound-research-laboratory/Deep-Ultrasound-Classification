@@ -18,3 +18,6 @@ python3 -m trainer.task --images ../../Dataset/V2.0_Processed --manifest ../../D
 find ../../Research/Dataset/V3.0_Processed -type d | grep frames$ | xargs -L 1 python3 -m cropall
 
 find . | grep .*/frames/frame.*.png | xargs rm
+
+# Copying things down from GC
+echo trial_a_ft_2_lr_4_seed_35_2019_04_01_16_30_51 | xargs -I{} bash -c "mkdir trial_a/{} && gsutil -m cp -R gs://research-storage/staging/{} trial_a/{}"

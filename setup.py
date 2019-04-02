@@ -4,6 +4,8 @@ from setuptools import find_packages
 REQUIRED_PACKAGES = [
     "dotmap",
     "numpy",
+    "scikit-learn",
+    "pandas",
     "tqdm>=4.24.0",
     "scipy>=1.1.0",
     "keras>=2.2.4",

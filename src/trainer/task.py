@@ -20,6 +20,9 @@ from keras.optimizers import Adam
 from keras.callbacks import EarlyStopping, TensorBoard
 from keras_preprocessing.image import ImageDataGenerator
 
+from sklearn.metrics import roc_curve, precision_recall_curve, confusion_matrix, roc_auc_score
+
+
 from constants.ultrasound import string_to_image_type, TUMOR_TYPES
 from pipeline.patientsample.patient_sample_generator import PatientSampleGenerator
 from utilities.partition.patient_partition import patient_train_test_split
@@ -36,11 +39,17 @@ def train_model(args):
     MODEL_FILE = "{0}.h5".format(args.identifier)
     TRAIN_DF_FILE = "{0}_train.csv".format(args.identifier)
     VALIDATION_DF_FILE = "{0}_validation.csv".format(args.identifier)
+    ROC_DF_FILE = "{0}_roc.csv".format(args.identifier)
+    PR_DF_FILE = "{0}_precision_recall.csv".format(args.identifier)
+    SCORES_DF_FILE = "{0}_scores.csv".format(args.identifier)
     HISTORY_DF_FILE = "{0}_history.csv".format(args.identifier)
     GC_MODEL_SAVE_PATH = "{0}/model/{1}".format(JOB_DIR, MODEL_FILE)
     GC_TRAIN_DF_SAVE_PATH = "{0}/data/{1}".format(JOB_DIR, TRAIN_DF_FILE)
     GC_VALIDATION_DF_SAVE_PATH = "{0}/data/{1}".format(JOB_DIR, VALIDATION_DF_FILE)
     GC_HISTORY_DF_SAVE_PATH = "{0}/data/{1}".format(JOB_DIR, HISTORY_DF_FILE)
+    GC_ROC_DF_SAVE_PATH = "{0}/data/{1}".format(JOB_DIR, ROC_DF_FILE)
+    GC_PR_DF_SAVE_PATH = "{0}/data/{1}".format(JOB_DIR, PR_DF_FILE)
+    GC_SCORES_DF_SAVE_PATH = "{0}/data/{1}".format(JOB_DIR, SCORES_DF_FILE)
 
     # Load the configuration file yaml file if provided
     try:
@@ -224,18 +233,81 @@ def train_model(args):
                 callbacks=[tb_callback]
             )
 
+    '''
+    Evaluate
+    '''
+
+    test_generator = test_data_generator.flow_from_dataframe(
+        dataframe=validation_df,
+        directory=None,
+        x_col="filename",
+        y_col="class",
+        target_size=config.target_shape,
+        color_mode="rgb",
+        class_mode="binary",
+        classes=TUMOR_TYPES,
+        batch_size=config.batch_size,
+        shuffle=False,
+        seed=config.random_seed,
+        drop_duplicates=False
+    )
+
+    model_predictions = model.predict_generator(
+        test_generator,
+        steps=(len(validation_df) // config.batch_size) + 1,
+        use_multiprocessing=True,
+        verbose=1
+    )
+
+    # Compute AUC score
+    auc_score = roc_auc_score(validation_df['class'].astype('category').cat.codes, model_predictions)
+    # ROC curve 
+    fpr, tpr, roc_thresholds = roc_curve(validation_df['class'], model_predictions, pos_label='MALIGNANT')
+    # Precision-Recall curve
+    precision, recall, pr_thresholds = precision_recall_curve(validation_df['class'], model_predictions, pos_label='MALIGNANT')
+    # Confusion matrix based metrics    
+    cm = confusion_matrix(validation_df['class'].astype('category').cat.codes, model_predictions.round())               
+    TP = cm[0][0]
+    FP = cm[0][1]
+    FN = cm[1][0]
+    TN = cm[1][1]
+    TPR = TP/(TP+FN) # Sensitivity, hit rate, recall
+    TNR = TN/(TN+FP) # Specificity or true negative rate
+    PPV = TP/(TP+FP) # Precision or positive predictive value
+    NPV = TN/(TN+FN) # Negative predictive value
+    FNR = FN/(TP+FN) # False negative rate
+
+    roc_df = pd.DataFrame(data={'fpr':fpr, 'tpr':tpr, 'thresholds':roc_thresholds})
+    
+    pr_df = pd.DataFrame(data={'recall':recall[:-1], 'precision':precision[:-1], 'thresholds':pr_thresholds})
+
+    scores_df = pd.DataFrame(data={'AUC':auc_score, 'Sensitivity': TPR, 'Specificity':TNR, 'PPV': PPV, 'NPV':NPV, FNR:'FNR', 'TP':TP, 'FP':FP, 'FN':FN, 'TN':TN}, index=[0])
+
+    if not IN_LOCAL_TRAINING_MODE:
         # Save the model
         model.save_weights(MODEL_FILE)
 
-        if not IN_LOCAL_TRAINING_MODE:
-            # Save the model on GC storage
-            with file_io.FileIO(MODEL_FILE, mode="rb") as input_f:
-                with file_io.FileIO(GC_MODEL_SAVE_PATH, mode="wb+") as output_f:
-                    output_f.write(input_f.read())
+        # Save the model on GC storage
+        with file_io.FileIO(MODEL_FILE, mode="rb") as input_f:
+            with file_io.FileIO(GC_MODEL_SAVE_PATH, mode="wb+") as output_f:
+                output_f.write(input_f.read())
 
-            # Save the training history on GC storage
-            with file_io.FileIO(GC_HISTORY_DF_SAVE_PATH, mode="wb+") as output_f:
-                pd.DataFrame(history.history).to_csv(output_f, index=False)
+        # Save the training history on GC storage
+        with file_io.FileIO(GC_HISTORY_DF_SAVE_PATH, mode="wb+") as output_f:
+            pd.DataFrame(history.history).to_csv(output_f, index=False)
+
+        # Save the ROC curve on GC storage
+        with file_io.FileIO(GC_ROC_DF_SAVE_PATH, mode="wb+") as output_f:
+            roc_df.to_csv(output_f, index=False)
+
+        # Save the Precision-Recall Curve on GC storage
+        with file_io.FileIO(GC_PR_DF_SAVE_PATH, mode="wb+") as output_f:
+            pr_df.to_csv(output_f, index=False)
+        
+        # Save the confusion matrix metrics on GC storage
+        with file_io.FileIO(GC_SCORES_DF_SAVE_PATH, mode="wb+") as output_f:
+            scores_df.to_csv(output_f, index=False)
+        
 
 if __name__ == "__main__":
 
