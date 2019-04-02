@@ -61,7 +61,7 @@ def patient_type_lists(manifest):
         else:
             malignant.append(pid)
 
-    return benign, malignant
+    return sorted(benign), sorted(malignant)
 
 
 def patient_lists_to_dataframe(patients, manifest, image_type, benign_prefix, malignant_prefix):

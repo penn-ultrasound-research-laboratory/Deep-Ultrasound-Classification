@@ -1,12 +1,11 @@
-identifier: local
+identifier: inception_v3_zca_samplewise
 image_type: GRAYSCALE
-model: vgg16
-target_shape: [325, 325]
-random_seed: 34
+model: inceptionv3
+target_shape: [300, 300]
+random_seed: 29
 train_split: 0.8  # training/validation ratio
 validation_split: 0.2
-training_epochs: 2
-fine_tune: [[block5_conv3, 2]]
+training_epochs: 150
 batch_size: 16
 learning_rate: 1.0e-4
 loss: binary_crossentropy
@@ -14,12 +13,9 @@ image_preprocessing_train:
   rescale: 0.003921568627 # rescale all inputs by 1/255
   horizontal_flip: True
   vertical_flip: True
+  samplewise_center: True
+  zca_whitening: True
 image_preprocessing_test:
-    rescale: 0.003921568627 # rescale all inputs by 1/255
-callbacks:
-  early_stop:
-    monitor: acc
-    min_delta: 0.005
-    patience: 5
-    mode: max
-    restore_best_weights: True
+  rescale: 0.003921568627 # rescale all inputs by 1/255
+  samplewise_center: True
+  zca_whitening: True

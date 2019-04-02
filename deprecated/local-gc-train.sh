@@ -19,7 +19,7 @@ IMAGES_PATH="gs://$STORAGE/$DATASET"
 MANIFEST_PATH="gs://$STORAGE/$MANIFEST"
 
 # Path to config
-CONFIG_FILE="default.yaml" 
+CONFIG_FILE="local.yaml" 
 MODEL_CONFIG_PATH="src/config/$CONFIG_FILE"
 
 # Number workers - will eventually be based on scale-tier
