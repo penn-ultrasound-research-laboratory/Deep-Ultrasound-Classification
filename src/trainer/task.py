@@ -278,10 +278,13 @@ def train_model(args):
     FNR = FN/(TP+FN) # False negative rate
 
     roc_df = pd.DataFrame(data={'fpr':fpr, 'tpr':tpr, 'thresholds':roc_thresholds})
-    
+
     pr_df = pd.DataFrame(data={'recall':recall[:-1], 'precision':precision[:-1], 'thresholds':pr_thresholds})
 
-    scores_df = pd.DataFrame(data={'AUC':auc_score, 'Sensitivity': TPR, 'Specificity':TNR, 'PPV': PPV, 'NPV':NPV, FNR:'FNR', 'TP':TP, 'FP':FP, 'FN':FN, 'TN':TN}, index=[0])
+    scores_df = pd.DataFrame(data={'AUC':auc_score, 'Sensitivity': TPR, 'Specificity':TNR, 'PPV': PPV, 'NPV':NPV, 'FNR':FNR, 'TP':TP, 'FP':FP, 'FN':FN, 'TN':TN}, index=[0])
+    
+    # Enforce column headers
+    scores_df = scores_df[['AUC', 'Sensitivity', 'Specificity', 'PPV', 'NPV', 'FNR', 'TP', 'FP', 'FN', 'TN']]
 
     if not IN_LOCAL_TRAINING_MODE:
         # Save the model
