@@ -21,3 +21,8 @@ find . | grep .*/frames/frame.*.png | xargs rm
 
 # Copying things down from GC
 echo trial_a_ft_2_lr_4_seed_35_2019_04_01_16_30_51 | xargs -I{} bash -c "mkdir trial_a/{} && gsutil -m cp -R gs://research-storage/staging/{} trial_a/{}"
+
+# Get the patient ID from the filename
+val_df['filename'].str.extract(r'gs://research-storage/V3.0_Processed/(?:Benign|Malignant)/(\w+)/', expand=False)  
+# Get the predictions mean from the groupby (uses scipy.stats) 
+val_df.groupby(['patient']).agg({'class': lambda x: stats.mode(x)[0][0], 'predictions':'mean', 'rounded':'any'})

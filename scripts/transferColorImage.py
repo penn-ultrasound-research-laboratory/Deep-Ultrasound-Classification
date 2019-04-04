@@ -1,23 +1,26 @@
 import argparse
 import json
 import os
+from shutil import copyfile
 
-def check_missing_files(args):
+# Iterate over the manifest and find everything where the image_type is COLOR
+# If the file exists in V2.0_Processed, copy to the corresponding subdirectory of V4.0_Processed
+
+def transfer_images(args):
 
     with open (args["manifest"]) as f:
         manifest = json.load(f)
 
-    missing_files = []
-
     # Searching for grayscale images that are listed in the manifest but the files do not exist
     for k in manifest:
         for frame in manifest[k]:
+
             src = "{0}/{1}/{2}/{3}".format(args["source"], frame["TUMOR_TYPE"], k, frame["FRAME"])
-            if not os.path.isfile(src):
-                missing_files.append("{0}: {1}".format(k, frame["FRAME"]))
-    
-    # We assert that no files are missing w.r.t the manifest
-    assert len(missing_files) == 0
+            dst = "{0}/{1}/{2}/{3}".format(args["destination"], frame["TUMOR_TYPE"], k, frame["FRAME"])
+
+            if frame["IMAGE_TYPE"] == "COLOR" and os.path.isfile(src):
+                copyfile(src, dst)
+
 
 if __name__ == "__main__":
 
@@ -36,6 +39,13 @@ if __name__ == "__main__":
         help="Path to source data directory",
         required=True
     )
+    
+    parser.add_argument(
+        "-D",
+        "--destination",
+        help="Path to destination data directory",
+        required=True
+    )
 
     args = parser.parse_args()
-    check_missing_files(args.__dict__)
+    transfer_images(args.__dict__)
