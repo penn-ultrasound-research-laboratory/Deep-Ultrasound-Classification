@@ -42,6 +42,7 @@ def train_model(args):
     PR_DF_FILE = "{0}_precision_recall.csv".format(args.identifier)
     SCORES_DF_FILE = "{0}_scores.csv".format(args.identifier)
     HISTORY_DF_FILE = "{0}_history.csv".format(args.identifier)
+    PREDICTIONS_DF_FILE = "{0}_predictions.csv".format(args.identifier)
     GC_MODEL_SAVE_PATH = "{0}/model/{1}".format(JOB_DIR, MODEL_FILE)
     GC_TRAIN_DF_SAVE_PATH = "{0}/data/{1}".format(JOB_DIR, TRAIN_DF_FILE)
     GC_VALIDATION_DF_SAVE_PATH = "{0}/data/{1}".format(JOB_DIR, VALIDATION_DF_FILE)
@@ -49,6 +50,7 @@ def train_model(args):
     GC_ROC_DF_SAVE_PATH = "{0}/data/{1}".format(JOB_DIR, ROC_DF_FILE)
     GC_PR_DF_SAVE_PATH = "{0}/data/{1}".format(JOB_DIR, PR_DF_FILE)
     GC_SCORES_DF_SAVE_PATH = "{0}/data/{1}".format(JOB_DIR, SCORES_DF_FILE)
+    GC_PREDICTIONS_DF_SAVE_PATH = "{0}/data/{1}".format(JOB_DIR, PREDICTIONS_DF_FILE)
 
     # Load the configuration file yaml file if provided
     try:
@@ -285,6 +287,8 @@ def train_model(args):
     # Enforce column headers
     scores_df = scores_df[['AUC', 'Sensitivity', 'Specificity', 'PPV', 'NPV', 'FNR', 'TP', 'FP', 'FN', 'TN']]
 
+    predictions_df = pd.DataFrame(model_predictions, columns=["predictions"])
+
     if not IN_LOCAL_TRAINING_MODE:
         # Save the model
         model.save_weights(MODEL_FILE)
@@ -309,6 +313,10 @@ def train_model(args):
         # Save the confusion matrix metrics on GC storage
         with file_io.FileIO(GC_SCORES_DF_SAVE_PATH, mode="wb+") as output_f:
             scores_df.to_csv(output_f, index=False)
+
+        # Save the model predictions on GC storage
+        with file_io.FileIO(GC_PREDICTIONS_DF_SAVE_PATH, mode="wb+") as output_f:
+            predictions_df.to_csv(output_f, index=False)
         
 
 if __name__ == "__main__":

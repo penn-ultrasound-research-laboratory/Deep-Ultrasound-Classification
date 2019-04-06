@@ -1,7 +1,7 @@
 identifier: vgg16
-image_type: GRAYSCALE
+image_type: COLOR
 model: vgg16
-target_shape: [325, 325]
+target_shape: [224, 224]
 random_seed: 37
 # training/validation ratio
 train_split: 0.8
