@@ -42,7 +42,9 @@ def train_model(args):
     PR_DF_FILE = "{0}_precision_recall.csv".format(args.identifier)
     SCORES_DF_FILE = "{0}_scores.csv".format(args.identifier)
     HISTORY_DF_FILE = "{0}_history.csv".format(args.identifier)
-    PREDICTIONS_DF_FILE = "{0}_predictions.csv".format(args.identifier)
+    TEST_PREDICTIONS_DF_FILE = "{0}_test_predictions.csv".format(args.identifier)
+    TRAIN_PREDICTIONS_DF_FILE = "{0}_train_predictions.csv".format(args.identifier)
+
     GC_MODEL_SAVE_PATH = "{0}/model/{1}".format(JOB_DIR, MODEL_FILE)
     GC_TRAIN_DF_SAVE_PATH = "{0}/data/{1}".format(JOB_DIR, TRAIN_DF_FILE)
     GC_VALIDATION_DF_SAVE_PATH = "{0}/data/{1}".format(JOB_DIR, VALIDATION_DF_FILE)
@@ -50,7 +52,8 @@ def train_model(args):
     GC_ROC_DF_SAVE_PATH = "{0}/data/{1}".format(JOB_DIR, ROC_DF_FILE)
     GC_PR_DF_SAVE_PATH = "{0}/data/{1}".format(JOB_DIR, PR_DF_FILE)
     GC_SCORES_DF_SAVE_PATH = "{0}/data/{1}".format(JOB_DIR, SCORES_DF_FILE)
-    GC_PREDICTIONS_DF_SAVE_PATH = "{0}/data/{1}".format(JOB_DIR, PREDICTIONS_DF_FILE)
+    GC_TEST_PREDICTIONS_DF_SAVE_PATH = "{0}/data/{1}".format(JOB_DIR, TEST_PREDICTIONS_DF_FILE)
+    GC_TRAIN_PREDICTIONS_DF_SAVE_PATH = "{0}/data/{1}".format(JOB_DIR, TRAIN_PREDICTIONS_DF_FILE)
 
     # Load the configuration file yaml file if provided
     try:
@@ -253,21 +256,43 @@ def train_model(args):
         drop_duplicates=False
     )
 
-    model_predictions = model.predict_generator(
+    train_prediction_generator = test_data_generator.flow_from_dataframe(
+        dataframe=train_df,
+        directory=None,
+        x_col="filename",
+        y_col="class",
+        target_size=config.target_shape,
+        color_mode="rgb",
+        class_mode="binary",
+        classes=TUMOR_TYPES,
+        batch_size=config.batch_size,
+        shuffle=False,
+        seed=config.random_seed,
+        drop_duplicates=False
+    )
+
+    test_predictions = model.predict_generator(
         test_generator,
         steps=(len(validation_df) // config.batch_size) + 1,
         use_multiprocessing=True,
         verbose=1
     )
 
+    training_predictions = model.predict_generator(
+        train_prediction_generator,
+        steps=(len(train_df) // config.batch_size) + 1,
+        use_multiprocessing=True,
+        verbose=1
+    )
+
     # Compute AUC score
-    auc_score = roc_auc_score(validation_df['class'].astype('category').cat.codes, model_predictions)
+    auc_score = roc_auc_score(validation_df['class'].astype('category').cat.codes, test_predictions)
     # ROC curve 
-    fpr, tpr, roc_thresholds = roc_curve(validation_df['class'], model_predictions, pos_label='MALIGNANT')
+    fpr, tpr, roc_thresholds = roc_curve(validation_df['class'], test_predictions, pos_label='MALIGNANT')
     # Precision-Recall curve
-    precision, recall, pr_thresholds = precision_recall_curve(validation_df['class'], model_predictions, pos_label='MALIGNANT')
+    precision, recall, pr_thresholds = precision_recall_curve(validation_df['class'], test_predictions, pos_label='MALIGNANT')
     # Confusion matrix based metrics    
-    cm = confusion_matrix(validation_df['class'].astype('category').cat.codes, model_predictions.round())               
+    cm = confusion_matrix(validation_df['class'].astype('category').cat.codes, test_predictions.round())               
     TP = cm[0][0]
     FP = cm[0][1]
     FN = cm[1][0]
@@ -287,7 +312,8 @@ def train_model(args):
     # Enforce column headers
     scores_df = scores_df[['AUC', 'Sensitivity', 'Specificity', 'PPV', 'NPV', 'FNR', 'TP', 'FP', 'FN', 'TN']]
 
-    predictions_df = pd.DataFrame(model_predictions, columns=["predictions"])
+    test_predictions_df = pd.DataFrame(test_predictions, columns=["predictions"])
+    training_predictions_df = pd.DataFrame(training_predictions, columns=["predictions"])
 
     if not IN_LOCAL_TRAINING_MODE:
         # Save the model
@@ -314,10 +340,14 @@ def train_model(args):
         with file_io.FileIO(GC_SCORES_DF_SAVE_PATH, mode="wb+") as output_f:
             scores_df.to_csv(output_f, index=False)
 
-        # Save the model predictions on GC storage
-        with file_io.FileIO(GC_PREDICTIONS_DF_SAVE_PATH, mode="wb+") as output_f:
-            predictions_df.to_csv(output_f, index=False)
-        
+        # Save the model test predictions on GC storage
+        with file_io.FileIO(GC_TEST_PREDICTIONS_DF_SAVE_PATH, mode="wb+") as output_f:
+            test_predictions_df.to_csv(output_f, index=False)
+
+        # Save the model train predictions on GC storage
+        with file_io.FileIO(GC_TRAIN_PREDICTIONS_DF_SAVE_PATH, mode="wb+") as output_f:
+            training_predictions_df.to_csv(output_f, index=False)
+
 
 if __name__ == "__main__":
 
