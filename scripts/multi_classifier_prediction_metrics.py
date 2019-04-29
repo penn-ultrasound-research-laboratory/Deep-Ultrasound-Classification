@@ -30,28 +30,22 @@ def prediction_metrics(args):
         'class': lambda x: stats.mode(x)[0][0],
         'gray_predictions':'mean'
     }).reset_index()
-    print(gray_patient_df.head(3))
 
     color_patient_df = color_validation_df.groupby(['patient']).agg({
         'class': lambda x: stats.mode(x)[0][0],
         'color_predictions': 'mean'
     }).reset_index()
-    
-    print(color_patient_df.head(3))
 
+    comp_patient_df = gray_patient_df.merge(color_patient_df.drop('class', axis=1), on="patient", how="inner")
+    comp_patient_df["predictions"] = (comp_patient_df["gray_predictions"] + comp_patient_df["color_predictions"]) / 2
 
-    comp_patient_df = gray_patient_df.merge(color_patient_df.drop('class', axis=1), on="patient", how="outer")
-    # comp_patient_df.drop('class_y', inplace=True, axis=1)
-    print(comp_patient_df)
-    return
-
-    # patient_df = patient_df[(patient_df['gray_predictions'] > 0])&(patient_df['color_predictions'] > 0))
+    print(comp_patient_df.head(3))
 
     # Compute AUC score
-    auc_score = roc_auc_score(patient_df['class'].astype('category').cat.codes, patient_df['predictions'])
-    acc_score = accuracy_score(patient_df['class'].astype('category').cat.codes, patient_df['predictions'].round())
+    auc_score = roc_auc_score(comp_patient_df['class'].astype('category').cat.codes, comp_patient_df['predictions'])
+    acc_score = accuracy_score(comp_patient_df['class'].astype('category').cat.codes, comp_patient_df['predictions'].round())
 
-    cm = confusion_matrix(patient_df['class'].astype('category').cat.codes, patient_df['predictions'].round())               
+    cm = confusion_matrix(comp_patient_df['class'].astype('category').cat.codes, comp_patient_df['predictions'].round())               
     TP = cm[0][0]
     FP = cm[0][1]
     FN = cm[1][0]
