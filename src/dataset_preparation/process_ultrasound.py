@@ -10,10 +10,10 @@ import cv2
 import numpy as np
 
 from src.utilities.image.image import determine_image_type
-from src.utilities.segmentation.brute.grayscale import load_select_save_scan_window
-from src.utilities.segmentation.brute.color import load_select_color_image_focus
+from src.dataset_preparation.segmentation.brute.grayscale import load_select_save_scan_window
+from src.dataset_preparation.segmentation.brute.color import load_select_color_image_focus
 
-from src.utilities.ocr.ocr import isolate_text
+from src.dataset_preparation.ocr.ocr import isolate_text
 
 from src.constants.ultrasound import (
     FOCUS_HASH_LABEL,
@@ -62,7 +62,7 @@ def frame_segmentation(
         # Integrate automatic segmentation (Xian) here to get the the tumor ROI (image focus)
         # from the scan window. Note: this only applies to grayscale frames
 
-    # Optionally run interpolation
+    # Optionally, run interpolation
     if interpolation_factor is not None:
         image_focus = cv2.resize(
             image_focus, 
@@ -91,8 +91,6 @@ def patient_ocr(
         abs_path_to_patient_folder,
         patient,
         rel_path_to_frames_folder,
-        rel_path_to_focus_output_folder,
-        timestamp,
         composite_records=None,
         patient_type_label=None):
     """Run OCR subroutine for an individual patient
@@ -126,15 +124,6 @@ def patient_ocr(
     abs_path_to_frame_dir = "{}/{}".format(
         abs_path_to_patient_folder.rstrip("/"),
         rel_path_to_frames_folder)
-
-    abs_path_to_focus_output_dir = "{}/{}_{}".format(
-        abs_path_to_patient_folder.rstrip("/"),
-        rel_path_to_focus_output_folder,
-        timestamp)
-
-    # Create the focus output directory if it does not exist
-    if not os.path.isdir(abs_path_to_focus_output_dir):
-        os.mkdir(abs_path_to_focus_output_dir)
 
     individual_patient_frames = [name for name in os.listdir(abs_path_to_frame_dir)]
 
@@ -372,60 +361,58 @@ def process_patient_set(
             patient_directory_absolute_path,
             patient_label,
             rel_path_to_frames_folder,
-            rel_path_to_focus_output_folder,
-            timestamp,
             composite_records=None,
             patient_type_label=patient_type_label)
 
         patient_records[patient_label] = acquired_records
 
     # Handle upscale to the maximum scale found in the corpus
-    if upscale_to_maximum:
+    # if upscale_to_maximum:
 
-        LOGGER.info("Scale to maximum flag TRUE. Attempting to get scale information.")
-        scale_minimum = 1000
-        scale_total = 0
-        scale_count = 0
-        scale_average = 0
+    #     LOGGER.info("Scale to maximum flag TRUE. Attempting to get scale information.")
+    #     scale_minimum = 1000
+    #     scale_total = 0
+    #     scale_count = 0
+    #     scale_average = 0
 
-        # Process each individual patient
-        for patient_label, patient_type_label, path in tqdm(all_patients, desc="Auto-scale"):
+    #     # Process each individual patient
+    #     for patient_label, patient_type_label, path in tqdm(all_patients, desc="Auto-scale"):
 
-            frames_with_none = []
-            scale_histogram = {}
+    #         frames_with_none = []
+    #         scale_histogram = {}
 
-            for frame in patient_records[patient_label]:
+    #         for frame in patient_records[patient_label]:
 
-                found_scale = frame.get(RA.SCALE, None)
+    #             found_scale = frame.get(RA.SCALE, None)
 
-                if found_scale is not None:
-                    scale_minimum = min(found_scale, scale_minimum)
-                    scale_total += found_scale
-                    scale_count += 1
+    #             if found_scale is not None:
+    #                 scale_minimum = min(found_scale, scale_minimum)
+    #                 scale_total += found_scale
+    #                 scale_count += 1
 
-                    if found_scale in scale_histogram:
-                        scale_histogram[found_scale] += 1
-                    else:
-                        scale_histogram[found_scale] = 1
-                else:
-                    # Frames with no specified scale are not included in the average
-                    frames_with_none.append(frame)
+    #                 if found_scale in scale_histogram:
+    #                     scale_histogram[found_scale] += 1
+    #                 else:
+    #                     scale_histogram[found_scale] = 1
+    #             else:
+    #                 # Frames with no specified scale are not included in the average
+    #                 frames_with_none.append(frame)
 
-            most_common_scale = max(scale_histogram, key=scale_histogram.get)
+    #         most_common_scale = max(scale_histogram, key=scale_histogram.get)
 
-            for frame_with_no_scale in frames_with_none:
-                LOGGER.info("Frame: %f missing scale. Updating with scale: %f",
-                            frame_with_no_scale[FRAME_LABEL], most_common_scale)
+    #         for frame_with_no_scale in frames_with_none:
+    #             LOGGER.info("Frame: %f missing scale. Updating with scale: %f",
+    #                         frame_with_no_scale[FRAME_LABEL], most_common_scale)
 
-                frame_with_no_scale[SCALE_LABEL] = most_common_scale
+    #             frame_with_no_scale[SCALE_LABEL] = most_common_scale
 
-        scale_average = scale_total / scale_count
+    #     scale_average = scale_total / scale_count
 
-        print("Scale to minimum. minimum: %f. Average: %f", scale_minimum, scale_average)
-        LOGGER.info("Scale to minimum. minimum: %f. Average: %f", scale_minimum, scale_average)
+    #     print("Scale to minimum. minimum: %f. Average: %f", scale_minimum, scale_average)
+    #     LOGGER.info("Scale to minimum. minimum: %f. Average: %f", scale_minimum, scale_average)
 
 
-    for patient_label, patient_type_label, path in tqdm(all_patients, desc="Segmentation"):
+    # for patient_label, patient_type_label, path in tqdm(all_patients, desc="Segmentation"):
 
         LOGGER.info("SEGMENTATION | Processing patient: %s", patient_label)
 
@@ -448,6 +435,89 @@ def process_patient_set(
     manifest_absolute_path = "{}/manifest_{}.json".format(
         path_to_manifest_output_dir.rstrip("/"),
         timestamp)
+
+    manifest_file = open(manifest_absolute_path, "a")
+
+    json.dump(patient_records, manifest_file)
+
+    # Cleanup
+    manifest_file.close()
+
+
+
+
+if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        "-d", "--dir-path", help="Top level dataset path", required=True
+    )
+
+    parser.add_argument(
+        "-M",
+        "--manifest-output",
+        help="Path to directory to output manifest",
+        default=".",
+        required=False,
+    )
+
+    parser.add_argument(
+        "-f",
+        "--frames-folder",
+        help="Path to patient files in the patient folder",
+        default=".",
+        required=False,
+    )
+
+    args = parser.parse_args().__dict__
+
+    path_to_benign_dir = os.path.join(args["dir_path"], "Benign")
+    path_to_malignant_dir = os.path.join(args["dir_path"], "Malignant")
+    rel_path_to_frames_folder = args["frames_folder"]
+
+    patient_records = {}
+
+    all_patients = [
+        (patient_label, patient_type_label, path)
+        for path, patient_type_label in [
+            (path_to_benign_dir, TUMOR_BENIGN),
+            (path_to_malignant_dir, TUMOR_MALIGNANT),
+        ]
+        for patient_label in [
+            name for name in os.listdir(path) if os.path.isdir(os.path.join(path, name))
+        ]
+    ]
+
+    print("There are {0} patients!".format(len(all_patients)))
+
+    # Process each individual patient
+    for patient_label, patient_type_label, path in tqdm(all_patients, desc="OCR"):
+
+        LOGGER.info("OCR | Processing patient: %s", patient_label)
+        print("OCR | Processing patient: %s", patient_label)
+
+        patient_directory_absolute_path = "{}/{}".format(
+            path.rstrip("/"), patient_label
+        )
+
+        acquired_records = patient_ocr(
+            patient_directory_absolute_path,
+            patient_label,
+            rel_path_to_frames_folder,
+            composite_records=None,
+            patient_type_label=patient_type_label,
+        )
+
+        patient_records[patient_label] = acquired_records
+
+        print(acquired_records)
+        break
+
+    # Dump the patient records to file
+    manifest_absolute_path = "{}/manifest_{}.json".format(
+        path_to_manifest_output_dir.rstrip("/"), timestamp
+    )
 
     manifest_file = open(manifest_absolute_path, "a")
 

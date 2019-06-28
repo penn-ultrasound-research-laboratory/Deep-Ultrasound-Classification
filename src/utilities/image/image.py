@@ -3,6 +3,7 @@ import logging
 import math
 import uuid
 import numpy as np
+import cv2
 
 from constants.ultrasound import IMAGE_TYPE
 from PIL import Image as pil_image
@@ -44,11 +45,12 @@ def determine_image_type(bgr_image, color_percentage_threshold=0.04):
         The color scale bar in true COLOR scans all but guarantees a percentage greater than 10%.
     """
     
-    b = bgr_image[0]
-    g = bgr_image[1]
-    r = bgr_image[2]
+    b = bgr_image[:, :, 0]
+    g = bgr_image[:, :, 1]
+    r = bgr_image[:, :, 2]
 
     equality_check = np.logical_and(np.logical_and(b == r, b == g), r == g)
+    # print(1.0 - (np.count_nonzero(equality_check) / equality_check.size))
 
     if 1.0 - (np.count_nonzero(equality_check) / equality_check.size) < color_percentage_threshold:
         return IMAGE_TYPE.GRAYSCALE
