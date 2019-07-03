@@ -13,7 +13,7 @@ now=$(date +"%Y%m%d_%H%M%S")
 JOB_NAME="grayscale_train_$now"
 JOB_DIR="gs://$STORAGE_BUCKET/staging/$JOB_NAME"
 
-# ml-engine configs
+# ai-platform configs
 runtime_version=1.12
 python_version=3.5
 
@@ -25,7 +25,7 @@ MANIFEST_PATH="gs://$STORAGE_BUCKET/$MANIFEST"
 NUM_WORKERS=2
 
 # Production run
-gcloud ml-engine jobs submit training $JOB_NAME \
+gcloud ai-platform jobs submit training $JOB_NAME \
         --module-name $MAIN_TRAINER_MODULE \
         --package-path $TRAINER_PACKAGE_PATH \
         --job-dir $JOB_DIR \
