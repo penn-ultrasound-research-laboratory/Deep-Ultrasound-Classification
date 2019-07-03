@@ -1,4 +1,4 @@
-TRAINER_PACKAGE_PATH="/Users/Matthew/Documents/Research/ultrasound-ml-engine/src"
+TRAINER_PACKAGE_PATH="/Users/Matthew/Documents/Research/ultrasound-ai-platform/src"
 now=$(date +"%Y%m%d_%H%M%S")
 JOB_NAME="grayscale_train_$now"
 MAIN_TRAINER_MODULE="trainer.task"
@@ -10,7 +10,7 @@ SCALE_TIER="basic"
 DATASET="V2.0_Processed"
 MANIFEST="manifest.json"
 
-# ml-engine configs
+# ai-platform configs
 runtime_version=1.12
 python_version=3.5
 
@@ -26,7 +26,7 @@ MODEL_CONFIG_PATH="src/config/$CONFIG_FILE"
 NUM_WORKERS=2
 
 # Production run
-gcloud ml-engine local train --package-path $TRAINER_PACKAGE_PATH \
+gcloud ai-platform local train --package-path $TRAINER_PACKAGE_PATH \
         --module-name $MAIN_TRAINER_MODULE \
         -- \
         --images $IMAGES_PATH \

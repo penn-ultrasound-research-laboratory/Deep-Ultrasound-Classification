@@ -21,9 +21,7 @@ from keras_preprocessing.image import ImageDataGenerator
 
 from sklearn.metrics import roc_curve, precision_recall_curve, confusion_matrix, roc_auc_score
 
-
 from constants.ultrasound import string_to_image_type, TUMOR_TYPES
-from pipeline.patientsample.patient_sample_generator import PatientSampleGenerator
 from utilities.partition.patient_partition import patient_train_test_split
 from utilities.general.general import default_none
 from utilities.manifest.manifest import patient_type_lists, patient_lists_to_dataframe
@@ -54,6 +52,8 @@ def train_model(args):
     GC_SCORES_DF_SAVE_PATH = "{0}/data/{1}".format(JOB_DIR, SCORES_DF_FILE)
     GC_TEST_PREDICTIONS_DF_SAVE_PATH = "{0}/data/{1}".format(JOB_DIR, TEST_PREDICTIONS_DF_FILE)
     GC_TRAIN_PREDICTIONS_DF_SAVE_PATH = "{0}/data/{1}".format(JOB_DIR, TRAIN_PREDICTIONS_DF_FILE)
+
+    print("Saving all training run outputs to: {0}".format(JOB_DIR))
 
     # Load the configuration file yaml file if provided
     try:
@@ -93,9 +93,9 @@ def train_model(args):
     if IN_LOCAL_TRAINING_MODE:
         print("Local training test. Limiting to six patients from each class.")
         benign_patients = np.random.choice(
-            benign_patients, 6, replace=False).tolist()
+            benign_patients, 10, replace=False).tolist()
         malignant_patients = np.random.choice(
-            malignant_patients, 6, replace=False).tolist()
+            malignant_patients, 10, replace=False).tolist()
 
     # Train/test split according to config
     patient_split = DotMap(patient_train_test_split(
@@ -392,7 +392,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "-i",
         "--identifier",
-        help="Base name to identify job in Google Cloud Storage & ML Engine",
+        help="Base name to identify job in Google Cloud Storage & AI Platform",
         default=None
     )
 
