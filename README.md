@@ -54,10 +54,12 @@ python3 -m trainer.task --images ../../Dataset/V4.0_Processed --manifest ../../D
 
 ## Google Cloud Training
 
-Run the "gc-train.py" script via command line to push a new training job to Google Cloud. NOTE: Examine the file gc-train.py file. Some user configuration IS required - i.e. setting your local path and bucket name. 
+1. **Navigate to gc-train.py and modify lines 7-9 to reflect your local development environment**
 
-Run the script via command line with `python3 -m gc-train [arguments]`
+2. Run the "gc-train.py" script via command line to push a new training job to Google Cloud (i.e. `python3 -m gc-train [arguments]`)
 
-Example:
+Example to run a Google Cloud job with a dataset named *V4.0_Processed*, manifest named *manifest.json* stored in Google Cloud Storage, configuration file *local.yaml* stored in \src\config, and test run identifier *my_test_run*:
 
-`python3 -m gc-train -I V4.0_Processed -M manifest.json -C local.yaml -i local`
+```
+python3 -m gc-train -I V4.0_Processed -M manifest.json -C local.yaml -i my_test_run
+```
